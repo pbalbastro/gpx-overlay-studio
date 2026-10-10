@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GPX Overlay Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Inter:wght@400;600&family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="dot"></span> GPX Overlay Studio</div>
+    <p>Upload a GPX file and export transparent PNG stat overlays for your photos and stories.</p>
+  </header>
+
+  <main class="layout">
+    <aside class="panel">
+      <section class="strava-box" id="stravaBox" hidden>
+        <a class="strava-connect" id="stravaConnect" href="/api/strava/login" hidden>Connect with Strava</a>
+        <div id="stravaConnected" hidden>
+          <div class="strava-head">
+            <span>Strava · <b id="stravaName"></b></span>
+            <button type="button" class="link" id="stravaLogout">Disconnect</button>
+          </div>
+          <ul class="strava-list" id="stravaList"></ul>
+          <button type="button" class="link" id="stravaMore" hidden>Load more</button>
+        </div>
+        <p class="powered">Powered by Strava</p>
+      </section>
+
+      <label class="drop" id="drop">
+        <!-- No accept filter: iOS doesn't know the .gpx type and greys the files out. -->
+        <input type="file" id="gpxInput" hidden />
+        <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7l5-5zm-7 14h14v4H5v-4z"/></svg>
+        <strong>Drop a GPX file</strong>
+        <span>or click to browse</span>
+      </label>
+      <button type="button" class="link" id="demo">Use demo activity</button>
+      <p class="error" id="error" role="alert"></p>
+
+      <div class="info" id="info"></div>
+
+      <div class="controls">
+        <h3>Canvas</h3>
+        <label>Size
+          <select id="size">
+            <option value="story">Story 1080×1920</option>
+            <option value="portrait">Portrait 1080×1350</option>
+            <option value="square">Square 1080×1080</option>
+          </select>
+        </label>
+
+        <h3>Units</h3>
+        <div class="two">
+          <label>Units
+            <select id="units">
+              <option value="km">Kilometers</option>
+              <option value="mi">Miles</option>
+            </select>
+          </label>
+          <label>Show
+            <select id="metric">
+              <option value="auto">Auto</option>
+              <option value="pace">Pace</option>
+              <option value="speed">Speed</option>
+            </select>
+          </label>
+        </div>
+        <label>Activity title
+          <input type="text" id="title" placeholder="Auto (e.g. Morning Run)" />
+        </label>
+        <div class="two">
+          <label>Avg power (W)
+            <input type="number" id="power" min="0" inputmode="numeric" placeholder="From file" />
+          </label>
+          <label>Calories
+            <input type="number" id="calories" min="0" inputmode="numeric" placeholder="Optional" />
+          </label>
+        </div>
+
+        <h3>Style</h3>
+        <label class="check"><input type="checkbox" id="shadow" checked /> Soft text shadow</label>
+        <label>Route thickness
+          <input type="range" id="routeWidth" min="0.5" max="2" step="0.1" value="1" />
+        </label>
+
+        <h3>Preview photo</h3>
+        <label class="file-btn">Choose photo
+          <input type="file" id="bgInput" accept="image/*" hidden />
+        </label>
+        <button type="button" class="link" id="clearBg" hidden>Remove photo</button>
+        <label class="check"><input type="checkbox" id="includeBg" /> Include photo in export</label>
+        <p class="hint">Without it, PNGs export with a transparent background.</p>
+      </div>
+    </aside>
+
+    <section class="stage">
+      <div class="preview-col">
+        <div class="preview checker" id="previewBox"><canvas id="preview"></canvas></div>
+        <div class="preview-bar">
+          <div>
+            <h2 id="tplName"></h2>
+            <p id="tplDesc"></p>
+          </div>
+          <div class="actions">
+            <button type="button" class="primary" id="download">Download PNG</button>
+            <button type="button" class="ghost" id="downloadAll">Download all</button>
+          </div>
+          <p class="hint" id="iosHint" hidden>Tap <b>Save to Photos</b>, then <b>Save Image</b>. The PNG stays transparent. The Photos app shows clear areas as white or black, but the overlay will sit over your photo in Instagram Stories.</p>
+        </div>
+      </div>
+      <div class="variations">
+        <h3>Variations</h3>
+        <div class="tabs" id="tabs" role="tablist" aria-label="Variation groups"></div>
+        <div class="grid" id="grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/logos.js"></script>
+  <script src="js/gpx.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/strava.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

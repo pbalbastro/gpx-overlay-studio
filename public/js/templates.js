@@ -4,7 +4,7 @@
 window.OV = window.OV || {};
 
 (function (OV) {
-  const { ORANGE } = OV;
+  const { ORANGE, WHITE } = OV;
 
   function groupSplits(splits, max) {
     if (splits.length <= max) {
@@ -568,7 +568,128 @@ window.OV = window.OV || {};
         OV.drawRoute(ctx, d.route, { x: cx - W * 0.33, y: rtop + (avail - rh) / 2, w: W * 0.66, h: rh }, { width: 12 * s * d.rw });
       },
     },
+
+    // ---------- White: minimalist, white only, light type and hairlines ----------
+    {
+      id: 'white-hairline',
+      name: 'Hairline',
+      desc: 'Thin white route, a hairline rule and three light stats.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const rw = W * 0.56, rh = H * 0.3, ry = H * 0.36 - rh / 2;
+        OV.drawRoute(ctx, d.route, { x: cx - rw / 2, y: ry, w: rw, h: rh }, { width: 5 * s * d.rw, color: WHITE });
+        const ly = H * 0.68;
+        hairline(ctx, cx - W * 0.38, ly - 80 * s, W * 0.76, s);
+        const colW = (W - 160 * s) / 3;
+        [d.dist, d.pace, d.time].forEach((it, i) => {
+          const x = 80 * s + colW * (i + 0.5);
+          capsLabel(ctx, it.label, x, ly, 22 * s);
+          OV.text(ctx, it.value, x, ly + 74 * s, { size: 54 * s, weight: 300, family: OV.INTER, maxWidth: colW * 0.9 });
+        });
+        OV.wordmark(ctx, d, cx, ly + 230 * s, 28 * s);
+      },
+    },
+    {
+      id: 'white-caption',
+      name: 'Caption',
+      desc: 'Editorial caption in the bottom-left corner, small route top-right.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, x = 90 * s, F = OV.INTER;
+        const rw = W * 0.3, rh = Math.min(H * 0.16, 260 * s);
+        OV.drawRoute(ctx, d.route, { x: W - x - rw, y: 110 * s, w: rw, h: rh }, { width: 5 * s * d.rw, color: WHITE, align: 'right' });
+
+        let y = H - 120 * s;
+        if (d.wordmark) {
+          OV.wordmark(ctx, d, x, y, 28 * s, 'left');
+          y -= 100 * s;
+        }
+        // Stats on one line, separated by faint slashes.
+        const parts = [d.dist.value, d.pace.value, d.time.value];
+        const sep = '   /   ';
+        const size = OV.fitSize(ctx, parts.join(sep), W - 2 * x, 46 * s, 300, 0, F);
+        let sx = x;
+        parts.forEach((p, i) => {
+          if (i) sx += OV.text(ctx, sep, sx, y, { size, weight: 300, family: F, align: 'left', alpha: 0.5 });
+          sx += OV.text(ctx, p, sx, y, { size, weight: 300, family: F, align: 'left' });
+        });
+        y -= size + 44 * s;
+        hairline(ctx, x, y, 120 * s, s);
+        y -= 44 * s;
+        OV.text(ctx, d.name, x, y, { size: 64 * s, weight: 600, family: F, align: 'left', maxWidth: W - 2 * x });
+        if (d.date) capsLabel(ctx, d.date, x, y - 84 * s, 22 * s, 'left');
+      },
+    },
+    {
+      id: 'white-number',
+      name: 'Quiet Number',
+      desc: 'One large, light distance figure with pace and time beneath.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2, F = OV.INTER;
+        const short = H / W < 1.5;
+        const ns = OV.fitSize(ctx, d.dist.num, W * 0.8, (short ? 240 : 300) * s, 300, 0, F);
+        const y = H * 0.45;
+        const rh = Math.min(H * 0.14, 150 * s), rw = W * 0.4;
+        OV.drawRoute(ctx, d.route, { x: cx - rw / 2, y: y - ns * 0.72 - 80 * s - rh, w: rw, h: rh }, { width: 5 * s * d.rw, color: WHITE });
+        OV.text(ctx, d.dist.num, cx, y, { size: ns, weight: 300, family: F });
+        capsLabel(ctx, d.dist.long, cx, y + 80 * s, 24 * s);
+        const colW = W * 0.3, ry = y + 190 * s;
+        [d.pace, d.time].forEach((it, i) => {
+          const x = cx + (i ? 1 : -1) * colW / 2;
+          capsLabel(ctx, it.label, x, ry, 20 * s);
+          OV.text(ctx, it.value, x, ry + 62 * s, { size: 44 * s, weight: 400, family: F, maxWidth: colW * 0.9 });
+        });
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillRect(cx - Math.max(1, s), ry - 22 * s, Math.max(1, 2 * s), 90 * s);
+        ctx.restore();
+        OV.wordmark(ctx, d, cx, H - 100 * s, 28 * s);
+      },
+    },
+    {
+      id: 'white-frame',
+      name: 'Frame',
+      desc: 'Thin white border with a stat in each corner and the route in the middle.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2, F = OV.INTER;
+        const m = 60 * s, p = m + 50 * s;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.lineWidth = Math.max(1, 2 * s);
+        ctx.strokeRect(m, m, W - 2 * m, H - 2 * m);
+        ctx.restore();
+
+        const ls = 20 * s, vs = 48 * s, maxW = W * 0.36;
+        const corner = (it, x, top, align) => {
+          capsLabel(ctx, it.label, x, top + ls * 0.8, ls, align);
+          OV.text(ctx, it.value, x, top + ls * 0.8 + vs * 1.2, { size: vs, weight: 300, family: F, align, maxWidth: maxW });
+        };
+        const blockH = ls * 0.8 + vs * 1.2;
+        corner(d.dist, p, p, 'left');
+        corner(d.pace, W - p, p, 'right');
+        corner(d.time, p, H - p - blockH, 'left');
+        corner(d.elev, W - p, H - p - blockH, 'right');
+
+        const rw = W * 0.6, rh = H * 0.34;
+        OV.drawRoute(ctx, d.route, { x: cx - rw / 2, y: H / 2 - rh / 2, w: rw, h: rh }, { width: 5 * s * d.rw, color: WHITE });
+        OV.wordmark(ctx, d, cx, H - p, 26 * s);
+      },
+    },
   ];
+
+  // Small uppercase, letter-spaced, slightly faded label in Inter. Canvas adds the
+  // spacing after the last letter too, so shift by it to keep the text centered.
+  function capsLabel(ctx, str, x, y, size, align = 'center') {
+    const sp = size * 0.25;
+    const dx = align === 'center' ? sp / 2 : align === 'right' ? sp : 0;
+    OV.text(ctx, String(str).toUpperCase(), x + dx, y, { size, weight: 600, family: OV.INTER, spacing: sp, align, alpha: 0.7 });
+  }
+
+  function hairline(ctx, x, y, w, s) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillRect(x, y, w, Math.max(1, 2 * s));
+    ctx.restore();
+  }
 
   // Hand outlines on a 100 x 130 grid (back of the hand, fingers up). Each shape is
   // a list of paths: the closed outline first, then open strokes for creases/thumb.
@@ -687,6 +808,7 @@ window.OV = window.OV || {};
     { id: 'ttrc', name: 'TTRC' },
     { id: 'kl', name: 'BISIKLISTA' },
     { id: 'apimycc', name: 'APIMYCC' },
+    { id: 'white', name: 'WHITE' },
   ];
   for (const t of templates) {
     const g = OV.groups.find((grp) => grp.id !== 'strava' && t.id.startsWith(`${grp.id}-`));

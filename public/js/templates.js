@@ -1,4 +1,4 @@
-// Overlay variations. Every template draws on a transparent canvas using only
+// Overlay templates. Every template draws on a transparent canvas using only
 // white type and Strava orange (#FC4C02). Layouts scale from a 1080px-wide
 // reference (s = W / 1080) so they work at any export or thumbnail size.
 window.OV = window.OV || {};
@@ -680,7 +680,7 @@ window.OV = window.OV || {};
 
   OV.templates = templates;
 
-  // Variation tabs. A template belongs to the group its id starts with
+  // Template tabs. A template belongs to the group its id starts with
   // ("ttrc-classic" -> TTRC); everything else is in STRAVA.
   OV.groups = [
     { id: 'strava', name: 'STRAVA' },

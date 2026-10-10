@@ -233,7 +233,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
 .ghost:hover { background: var(--orange-dim); }
 .actions button:disabled { opacity: 0.5; cursor: progress; }
 
-.variations h3 {
+.templates h3 {
   margin: 0 0 12px;
   font-size: 11px;
   text-transform: uppercase;

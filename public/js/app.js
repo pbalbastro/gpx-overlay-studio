@@ -386,8 +386,8 @@
     OV.initStrava({
       onActivity: ({ meta, stats, calories }) => {
         setActivity(meta, stats, 'strava', { calories });
-        // On phones the variations are below the panel; bring them into view.
-        if (isPhoneLayout()) document.querySelector('.variations').scrollIntoView({ behavior: 'smooth' });
+        // On phones the templates are below the panel; bring them into view.
+        if (isPhoneLayout()) document.querySelector('.templates').scrollIntoView({ behavior: 'smooth' });
       },
       onError: (msg) => { $('error').textContent = msg; },
     });

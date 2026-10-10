@@ -358,7 +358,9 @@ window.OV = window.OV || {};
     return p;
   }
 
-  function fitRoute(points, box, align = 'center') {
+  // How projected route coordinates map onto the canvas when the route is fitted
+  // into `box`: canvas = projected * sc + (ox, oy). Map tiles use the same view.
+  function routeView(points, box, align = 'center') {
     const pr = projected(points);
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const q of pr) {
@@ -374,6 +376,12 @@ window.OV = window.OV || {};
     if (align === 'center') ox += (box.w - w * sc) / 2;
     else if (align === 'right') ox += box.w - w * sc;
     const oy = box.y - minY * sc + (box.h - h * sc) / 2;
+    return { sc, ox, oy };
+  }
+
+  function fitRoute(points, box, align = 'center', view = routeView(points, box, align)) {
+    const pr = projected(points);
+    const { sc, ox, oy } = view;
 
     const out = [];
     let last = null;
@@ -404,7 +412,7 @@ window.OV = window.OV || {};
 
   function drawRoute(ctx, points, box, o = {}) {
     if (!points || points.length < 2) return []; // e.g. a manual Strava activity with no GPS
-    const pts = fitRoute(points, box, o.align);
+    const pts = fitRoute(points, box, o.align, o.view);
     const w = o.width || 10;
     ctx.save();
     ctx.lineCap = 'round';
@@ -510,6 +518,6 @@ window.OV = window.OV || {};
 
   Object.assign(OV, {
     WHITE, ORANGE, CONDENSED, INTER, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
-    drawRoute, drawProfile, roundRect, drawCover,
+    drawRoute, drawProfile, roundRect, drawCover, routeView,
   });
 })(window.OV);

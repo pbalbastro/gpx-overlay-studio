@@ -273,67 +273,25 @@ window.OV = window.OV || {};
     };
   }
 
-  // Demo route shape: a loop around Andorra (Encamp, Andorra la Vella, Sant Julia,
-  // the western valleys, La Massana and back), traced as map-pixel x,y pairs
-  // (x east, y south). The demo squeezes it into a ~7 km run.
-  const DEMO_ROUTE = [
-    481,90, 472,91, 466,95, 460,99, 452,104, 447,108, 442,113, 440,118, 439,122, 436,126, 433,130, 430,133,
-    420,135, 410,139, 400,141, 392,143, 386,148, 380,155, 375,158, 368,161, 363,164, 360,168, 358,175, 355,180, 353,184, 352,190, 353,195, 348,197, 342,197, 338,195, 332,194, 325,193, 320,191,
-    315,192, 311,190, 309,188, 305,186, 302,184, 299,181, 297,176, 295,172, 292,168, 290,164, 288,160, 287,155, 287,150, 287,145, 286,140, 285,136, 282,133, 277,132, 272,131, 269,134, 268,139, 268,145, 265,146, 260,145, 257,142, 253,141, 248,142, 243,143, 237,141, 230,141, 220,141, 213,142, 207,145, 205,148, 200,150, 192,150, 188,151, 185,153, 181,155, 178,157, 175,160, 173,163, 171,165, 170,170, 168,175, 167,180, 165,184, 163,186,
-    160,187, 155,186, 150,186, 148,183, 145,181, 138,181, 132,177, 125,176, 120,177, 115,179, 112,181, 110,186, 108,184, 104,179, 100,175, 95,175, 90,176, 87,174, 83,175, 80,173, 80,169, 79,165, 77,162, 78,158, 81,155, 85,152, 86,151, 83,155, 79,156, 78,152, 76,155, 70,155, 64,154, 60,153, 55,152, 51,155, 48,156, 50,152, 53,147, 48,143, 40,141, 33,139, 28,136, 22,133, 17,129, 14,124, 12,118, 12,113, 14,110, 18,107, 22,104, 26,102, 35,100, 45,100, 50,101, 58,101, 52,102, 47,104, 42,106, 38,109, 38,112, 45,113, 55,114, 65,115, 75,115, 82,114, 88,112, 95,110, 99,108, 102,104, 106,100, 107,96, 103,96, 99,99, 93,99, 85,99, 75,99, 68,97, 72,96, 77,94, 82,91, 85,87, 90,83, 95,82, 98,78, 100,75, 102,72, 104,68, 107,63, 109,60, 111,57, 113,55, 118,55, 120,57, 123,56, 128,55, 133,53, 137,50, 140,48, 142,45, 141,40, 142,36, 144,33, 146,32, 150,33, 152,35, 152,40, 153,45, 155,47, 158,47, 161,45, 162,38, 163,30, 164,24,
-    166,18, 170,13, 175,11, 180,9, 184,9, 190,12, 197,13, 203,14, 207,16, 213,15, 220,15, 226,17, 229,22, 230,30, 231,35, 233,40, 236,44, 239,48, 240,39, 246,36, 248,40, 249,46, 251,52, 253,61, 256,58, 261,53, 262,48, 268,46, 272,43, 275,39, 282,37, 291,36, 293,43, 294,48, 301,49, 302,54, 301,60, 303,66, 308,72, 310,79, 314,80, 318,80, 319,84, 322,86,
-    328,83, 331,78, 334,76, 338,79, 343,80, 338,79, 334,76, 330,73, 327,70, 327,67, 330,65, 334,65, 338,66, 342,65, 346,61, 349,57, 350,52, 352,47, 356,42, 360,36, 365,33, 370,34, 374,38, 377,46, 380,53, 384,59, 389,65, 394,71, 396,80, 396,90, 397,100, 399,108, 401,113, 404,118, 410,122, 418,127, 425,131, 430,133,
-    433,130, 436,126, 439,122, 440,118, 442,113, 447,108, 452,104, 460,99, 466,95, 472,91, 481,90,
-  ];
-
-  // A synthetic ~7 km morning run so the app has something to show before upload.
+  // The demo activity (js/demo.js) rebuilt as GPX text, so it goes through the
+  // same parser as an uploaded file.
   function demoGPX() {
-    const pts = [];
-    const lat0 = -6.2297, lon0 = 106.8022;
-    let t = Date.parse('2026-10-09T06:12:00+07:00');
-    const step = 5; // meters
-    const dt = step / (1000 / 299); // seconds per step at 4:59 /km
-    const total = 7095;
-    const n = Math.round(total / step);
-
-    // Cumulative pixel length along the traced shape, then meters per pixel.
-    const xy = [];
-    for (let i = 0; i < DEMO_ROUTE.length; i += 2) xy.push([DEMO_ROUTE[i], DEMO_ROUTE[i + 1]]);
-    const cum = [0];
-    for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
-    const mpp = total / cum[cum.length - 1];
-
-    // Sample a point every `step` meters along the shape (local meters, y north).
-    const local = [];
-    let seg = 1;
-    for (let i = 0; i <= n; i++) {
-      const along = Math.min(i * step / mpp, cum[cum.length - 1]);
-      while (seg < cum.length - 1 && cum[seg] < along) seg++;
-      const f = (along - cum[seg - 1]) / (cum[seg] - cum[seg - 1] || 1);
-      local.push([
-        (xy[seg - 1][0] + (xy[seg][0] - xy[seg - 1][0]) * f) * mpp,
-        -(xy[seg - 1][1] + (xy[seg][1] - xy[seg - 1][1]) * f) * mpp,
-      ]);
-    }
-    // Straight hops between samples cut the sharp corners; scale back up to `total`.
-    let chords = 0;
-    for (let i = 1; i < local.length; i++) chords += Math.hypot(local[i][0] - local[i - 1][0], local[i][1] - local[i - 1][1]);
-    const k = total / chords;
-    const mPerDeg = (6371008.8 * Math.PI) / 180; // same Earth radius as haversine()
-
-    for (let i = 0; i <= n; i++) {
-      const lat = lat0 + (local[i][1] * k) / mPerDeg;
-      const lon = lon0 + (local[i][0] * k) / (mPerDeg * Math.cos(toRad(lat0)));
-      const ele = 22 + 9 * Math.sin(i / 160) + 4 * Math.sin(i / 47);
-      const hr = Math.round(158 + 10 * Math.sin(i / 200) + i / 120);
-      const cad = Math.round(87 + 2 * Math.sin(i / 60));
-      pts.push(`<trkpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><ele>${ele.toFixed(1)}</ele><time>${new Date(t).toISOString()}</time>` +
-        `<extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${hr}</gpxtpx:hr><gpxtpx:cad>${cad}</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>`);
-      t += dt * 1000 * (1 + 0.05 * Math.sin(i / 230));
-    }
+    const D = OV.DEMO;
+    const list = (s, delta) => {
+      let acc = 0;
+      return s.split(',').map((v) => (v === '' ? null : delta ? (acc += +v) : +v));
+    };
+    const lat = list(D.lat, true), lon = list(D.lon, true), ele = list(D.ele, true), t = list(D.t, true);
+    const hr = list(D.hr), cad = list(D.cad), power = list(D.power);
+    const t0 = Date.parse(D.start);
+    const pts = lat.map((_, i) =>
+      `<trkpt lat="${(lat[i] / 1e7).toFixed(7)}" lon="${(lon[i] / 1e7).toFixed(7)}"><ele>${(ele[i] / 10).toFixed(1)}</ele>` +
+      `<time>${new Date(t0 + t[i] * 1000).toISOString()}</time><extensions>${power[i] == null ? '' : `<power>${power[i]}</power>`}` +
+      `<gpxtpx:TrackPointExtension>${hr[i] == null ? '' : `<gpxtpx:hr>${hr[i]}</gpxtpx:hr>`}` +
+      `${cad[i] == null ? '' : `<gpxtpx:cad>${cad[i]}</gpxtpx:cad>`}</gpxtpx:TrackPointExtension></extensions></trkpt>`);
     return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="demo" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
-<trk><name>Morning Run</name><type>running</type><trkseg>${pts.join('')}</trkseg></trk></gpx>`;
+<trk><name>${D.name}</name><type>${D.type}</type><trkseg>${pts.join('')}</trkseg></trk></gpx>`;
   }
 
   Object.assign(OV, { parseGPX, computeStats, buildData, fmtPace, demoGPX });

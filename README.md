@@ -51,7 +51,7 @@ New Strava API apps allow **one athlete**, the app owner, until Strava approves 
 ## Features
 
 - Parses `trkpt` (or `rtept`) points: distance (haversine), moving time, pace or speed, elevation gain, per-km/mi splits and the elevation profile
-- 31 overlay templates: Classic Stack, Route Hero, Bottom Bar, Corner Stack, Big Number, Minimal Route, Four Corners, Side Accent, Activity Card, Elevation Profile, Splits, One Line, Route Map, Middle Finger, Rock On, Stats Grid (sports-watch style, with heart rate and cadence when the GPX has them), Strava Stats (app-style stat screen; power from the GPX, calories typed in the panel), plus TTRC running-club layouts (TTRC Classic, TTRC Side, TTRC Pace, TTRC Bar) with a STRAVA | TTRC lockup, KL Bisiklista Classic with a STRAVA | KL BISIKLISTA lockup, APIMYCC cycling-club layouts (Classic, Ride Bar, Side, Hero, Climb) with a STRAVA | APIMYCC lockup, and minimalist WHITE layouts (Hairline, Caption, Quiet Number, Frame) in light white type with a thin white route
+- 36 overlay templates: Classic Stack, Route Hero, Bottom Bar, Corner Stack, Big Number, Minimal Route, Four Corners, Side Accent, Activity Card, Elevation Profile, Splits, One Line, Route Map, Middle Finger, Rock On, Stats Grid (sports-watch style, with heart rate and cadence when the GPX has them), Strava Stats (app-style stat screen; power from the GPX, calories typed in the panel), plus TTRC running-club layouts (TTRC Classic, TTRC Side, TTRC Pace, TTRC Bar) with a STRAVA | TTRC lockup, KL Bisiklista Classic with a STRAVA | KL BISIKLISTA lockup, APIMYCC cycling-club layouts (Classic, Ride Bar, Side, Hero, Climb) with a STRAVA | APIMYCC lockup, and minimalist WHITE layouts (Hairline, Caption, Quiet Number, Frame) in light white type with a thin white route, and MAP layouts (Activity Page, Feed Card, Feed Card Stats with the six Strava stat-screen stats, Map Tile, Full Map) that put the route on a real street map styled like the Strava app (OpenStreetMap data via [OpenFreeMap](https://openfreemap.org), rendered with MapLibre GL; no API key)
 - Story (1080×1920), Portrait (1080×1350) and Square (1080×1080) exports
 - km or miles
 - Editable title, STRAVA logo (drawn from the logotype image, like the club logos), adjustable route thickness, optional soft shadow
@@ -67,8 +67,10 @@ public/index.html          UI markup
 public/css/style.css       app styling
 public/js/logos.js         embedded club logos (image + vector; source PNGs in assets/)
 public/js/gpx.js           GPX parsing, stats, formatting, demo activity
+public/js/demo.js          the demo ride ("Kalabaw"), compactly encoded
 public/js/strava.js        Strava panel; converts Strava activities to the app's stats
 public/js/render.js        canvas primitives (text, stat stacks/rows, route, elevation profile)
+public/js/map.js           street-map backgrounds for the MAP templates (MapLibre + OpenFreeMap)
 public/js/templates.js     the overlay templates and tab groups
 public/js/app.js           UI wiring, preview, thumbnails, PNG export
 public/samples/            example GPX file

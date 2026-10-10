@@ -322,25 +322,8 @@ window.OV = window.OV || {};
       desc: 'Strava app stat screen: two centered columns of label over value, white only.',
       draw(ctx, W, H, d) {
         const s = W / 1080, F = OV.INTER;
-        // Calories and power come from the side panel / file; fill gaps with other stats.
-        const extras = [
-          d.hr && { label: 'Avg Heart Rate', value: `${d.hr.num} bpm` },
-          d.cadence && { label: 'Cadence', value: `${d.cadence.num} ${d.cadence.unit}` },
-          d.best && { label: d.best.label, value: `${d.best.num} ${d.best.unit}` },
-          d.elapsed && { label: 'Elapsed Time', value: d.elapsed.clock },
-        ].filter(Boolean);
-        const take = (stat) => stat || extras.shift() || { label: '', value: '' };
-        const pace = d.useSpeed
-          ? { label: 'Avg Speed', value: `${d.speed.num} ${d.speed.unit}` }
-          : { label: 'Avg Pace', value: `${d.pace.num} ${d.pace.unit}` };
-        const cells = [
-          { label: d.dist.label, value: d.dist.value },
-          { label: 'Elevation Gain', value: d.elev.value },
-          { label: 'Moving Time', value: d.time.clock },
-          take(d.power),
-          pace,
-          take(d.calories),
-        ];
+        const c = stravaCells(d);
+        const cells = [c.dist, c.elev, c.time, c.power, c.pace, c.calories];
 
         const ls = 40 * s, vs = 68 * s;             // label / value sizes
         const toValue = 74 * s, pitch = 225 * s;     // label->value baseline, row spacing
@@ -674,7 +657,177 @@ window.OV = window.OV || {};
         OV.wordmark(ctx, d, cx, H - p, 26 * s);
       },
     },
+
+    // ---------- Map: a real street map under the route (js/map.js), Strava app style ----------
+    {
+      id: 'map-activity',
+      name: 'Activity Page',
+      desc: 'Like the Strava activity screen: map on top, white sheet with title and stats.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080;
+        const sheetY = H * (H / W < 1.5 ? 0.56 : 0.66);
+        const r = 40 * s;
+        OV.drawMap(ctx, d.route, { x: 0, y: 0, w: W, h: sheetY + r }, {
+          inner: { x: W * 0.1, y: Math.max(H * 0.06, 90 * s), w: W * 0.8, h: sheetY - Math.max(H * 0.06, 90 * s) - 80 * s },
+          width: 9 * d.rw,
+        });
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.18)';
+        ctx.shadowBlur = 30 * s;
+        ctx.fillStyle = '#FFFFFF';
+        OV.roundRect(ctx, 0, sheetY, W, H - sheetY + r, r);
+        ctx.fill();
+        ctx.restore();
+
+        noShadow(ctx, () => {
+          const x = 70 * s;
+          let y = sheetY + 110 * s;
+          OV.wordmark(ctx, d, x, y - 4 * s, 26 * s, 'left', ORANGE);
+          y += 90 * s;
+          OV.text(ctx, d.name, x, y, { size: 56 * s, weight: 600, family: OV.INTER, color: OV.MAP_TEXT, align: 'left', maxWidth: W - 2 * x });
+          if (d.date) OV.text(ctx, d.date, x, y + 50 * s, { size: 28 * s, weight: 400, family: OV.INTER, color: OV.MAP_MUTED, align: 'left' });
+          mapStats(ctx, [d.dist, d.pace, d.time], x, W - 2 * x, y + 140 * s, 26 * s, 54 * s, 'left');
+        });
+      },
+    },
+    {
+      id: 'map-card',
+      name: 'Feed Card',
+      desc: 'A Strava feed post: white card with title, stats and the route on a map.',
+      draw(ctx, W, H, d) { feedCard(ctx, W, H, d, [[d.dist, d.pace, d.time]]); },
+    },
+    {
+      id: 'map-card-stats',
+      name: 'Feed Card Stats',
+      desc: 'Feed Card with six stats like the Strava stat screen: power from the file, calories from the panel.',
+      draw(ctx, W, H, d) {
+        const c = stravaCells(d);
+        feedCard(ctx, W, H, d, [[c.dist, c.pace, c.time], [c.elev, c.power, c.calories]]);
+      },
+    },
+    {
+      id: 'map-tile',
+      name: 'Map Tile',
+      desc: 'Rounded map square with the route, stats and wordmark in white below.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const short = H / W < 1.5;
+        const size = Math.min(W * 0.84, H * (short ? 0.58 : 0.5));
+        const y0 = short ? 70 * s : H * 0.12;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 40 * s;
+        ctx.shadowOffsetY = 8 * s;
+        ctx.fillStyle = '#FFFFFF';
+        OV.roundRect(ctx, cx - size / 2, y0, size, size, 36 * s);
+        ctx.fill();
+        ctx.restore();
+        OV.drawMap(ctx, d.route, { x: cx - size / 2, y: y0, w: size, h: size }, { radius: 36 * s, width: 9 * d.rw });
+        const bottom = OV.row(ctx, [d.dist, d.pace, d.time], 40 * s, W - 80 * s, y0 + size + 70 * s, {
+          labelSize: 28 * s, valueSize: 58 * s,
+        });
+        OV.wordmark(ctx, d, cx, bottom + (short ? 90 : 130) * s, 40 * s);
+      },
+    },
+    {
+      id: 'map-full',
+      name: 'Full Map',
+      desc: 'Edge-to-edge map with the stats in a floating white bar at the bottom.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080;
+        const bh = 210 * s, bx = 50 * s, by = H - bh - 70 * s;
+        OV.drawMap(ctx, d.route, { x: 0, y: 0, w: W, h: H }, {
+          inner: { x: W * 0.1, y: H * 0.1, w: W * 0.8, h: by - H * 0.1 - 70 * s },
+          width: 9 * d.rw,
+        });
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.22)';
+        ctx.shadowBlur = 30 * s;
+        ctx.shadowOffsetY = 6 * s;
+        ctx.fillStyle = '#FFFFFF';
+        OV.roundRect(ctx, bx, by, W - 2 * bx, bh, 28 * s);
+        ctx.fill();
+        ctx.restore();
+        noShadow(ctx, () => {
+          mapStats(ctx, [d.dist, d.pace, d.time], bx, W - 2 * bx, by + 50 * s, 24 * s, 50 * s, 'center');
+          OV.wordmark(ctx, d, W / 2, by + bh - 34 * s, 20 * s, 'center', ORANGE);
+        });
+      },
+    },
   ];
+
+  // Runs `fn` with the page-wide text shadow turned off (dark text on white cards).
+  function noShadow(ctx, fn) {
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    fn();
+    ctx.restore();
+  }
+
+  // The six stats on Strava's stat screen, as { label, value }. Power comes from the
+  // file and calories from the side panel; when either is missing, another stat the
+  // file does have (heart rate, cadence, best split, elapsed time) takes its place.
+  function stravaCells(d) {
+    const extras = [
+      d.hr && { label: 'Avg Heart Rate', value: `${d.hr.num} bpm` },
+      d.cadence && { label: 'Cadence', value: `${d.cadence.num} ${d.cadence.unit}` },
+      d.best && { label: d.best.label, value: `${d.best.num} ${d.best.unit}` },
+      d.elapsed && { label: 'Elapsed Time', value: d.elapsed.clock },
+    ].filter(Boolean);
+    const take = (stat) => stat || extras.shift() || { label: '', value: '' };
+    return {
+      dist: { label: d.dist.label, value: d.dist.value },
+      elev: { label: 'Elevation Gain', value: d.elev.value },
+      time: { label: 'Moving Time', value: d.time.clock },
+      pace: d.useSpeed
+        ? { label: 'Avg Speed', value: `${d.speed.num} ${d.speed.unit}` }
+        : { label: 'Avg Pace', value: `${d.pace.num} ${d.pace.unit}` },
+      power: take(d.power),
+      calories: take(d.calories),
+    };
+  }
+
+  // White Strava feed card at the bottom: title, date and wordmark, one or more rows
+  // of three stats, then the route on a map.
+  function feedCard(ctx, W, H, d, rows) {
+    const s = W / 1080;
+    const x0 = 60 * s, cw = W - 120 * s, pad = 50 * s, r = 32 * s;
+    const pitch = 120 * s; // between stat rows
+    const head = 330 * s + (rows.length - 1) * pitch;
+    const mapH = Math.min(cw * 0.62, H - head - 2 * Math.max(80 * s, H * 0.06));
+    const ch = head + mapH;
+    const y0 = H - ch - Math.max(80 * s, H * 0.06);
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.25)';
+    ctx.shadowBlur = 40 * s;
+    ctx.shadowOffsetY = 8 * s;
+    ctx.fillStyle = '#FFFFFF';
+    OV.roundRect(ctx, x0, y0, cw, ch, r);
+    ctx.fill();
+    ctx.restore();
+
+    noShadow(ctx, () => {
+      const y = y0 + pad + 40 * s;
+      OV.text(ctx, d.name, x0 + pad, y, { size: 44 * s, weight: 600, family: OV.INTER, color: OV.MAP_TEXT, align: 'left', maxWidth: cw - 2 * pad - 200 * s });
+      OV.wordmark(ctx, d, x0 + cw - pad, y - 6 * s, 24 * s, 'right', ORANGE);
+      if (d.date) OV.text(ctx, d.date, x0 + pad, y + 44 * s, { size: 26 * s, weight: 400, family: OV.INTER, color: OV.MAP_MUTED, align: 'left' });
+      rows.forEach((items, i) => mapStats(ctx, items, x0 + pad, cw - 2 * pad, y + 110 * s + i * pitch, 24 * s, 46 * s, 'left'));
+    });
+    OV.drawMap(ctx, d.route, { x: x0, y: y0 + head, w: cw, h: mapH }, { radius: r, corners: 'bottom', width: 8 * d.rw });
+  }
+
+  // Strava app stat columns: grey label over a dark value, in Inter.
+  function mapStats(ctx, items, x0, w, y, ls, vs, align) {
+    const colW = w / items.length;
+    items.forEach((it, i) => {
+      const x = align === 'center' ? x0 + colW * (i + 0.5) : x0 + colW * i;
+      OV.text(ctx, it.label, x, y + ls * 0.8, { size: ls, weight: 400, family: OV.INTER, color: OV.MAP_MUTED, align });
+      OV.text(ctx, it.value, x, y + ls * 0.8 + vs * 1.15, {
+        size: vs, weight: 600, family: OV.INTER, color: OV.MAP_TEXT, align, maxWidth: colW * 0.92,
+      });
+    });
+  }
 
   // Small uppercase, letter-spaced, slightly faded label in Inter. Canvas adds the
   // spacing after the last letter too, so shift by it to keep the text centered.
@@ -809,6 +962,7 @@ window.OV = window.OV || {};
     { id: 'kl', name: 'BISIKLISTA' },
     { id: 'apimycc', name: 'APIMYCC' },
     { id: 'white', name: 'WHITE' },
+    { id: 'map', name: 'MAP' },
   ];
   for (const t of templates) {
     const g = OV.groups.find((grp) => grp.id !== 'strava' && t.id.startsWith(`${grp.id}-`));

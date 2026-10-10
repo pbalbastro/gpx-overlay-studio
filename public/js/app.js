@@ -239,12 +239,18 @@
   }
 
   // Renders the export-size PNG (transparent unless the photo is included).
-  function renderFile(tpl) {
+  async function renderFile(tpl) {
     const opts = readOpts();
     const [W, H] = SIZES[opts.size];
     const canvas = document.createElement('canvas');
     const d = currentData(opts);
-    paint(canvas, tpl, W, H, d, opts, opts.includeBg ? state.bg : null);
+    const bg = opts.includeBg ? state.bg : null;
+    paint(canvas, tpl, W, H, d, opts, bg);
+    // Map templates fetch tiles on first paint; wait for them, then paint again.
+    for (let i = 0; i < 3 && OV.mapPending(); i++) {
+      await OV.mapSettled();
+      paint(canvas, tpl, W, H, d, opts, bg);
+    }
     const name = `${slug(d.name)}-${tpl.id}-${opts.size}.png`;
     return new Promise((resolve) =>
       canvas.toBlob((blob) => resolve(new File([blob], name, { type: 'image/png' })), 'image/png'));
@@ -372,11 +378,12 @@
     if (!document.fonts) return;
     const loads = [500, 600, 700, 800, 900].map((w) => document.fonts.load(`${w} 40px "Montserrat"`))
       .concat([500, 600].map((w) => document.fonts.load(`${w} 40px "Barlow Condensed"`)))
-      .concat([400, 600].map((w) => document.fonts.load(`${w} 40px "Inter"`)));
+      .concat([300, 400, 600].map((w) => document.fonts.load(`${w} 40px "Inter"`)));
     await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 3000))]).catch(() => {});
   }
 
   async function init() {
+    OV.onMapUpdate = scheduleRender; // repaint as map tiles arrive
     buildGrid();
     buildTabs();
     wire();

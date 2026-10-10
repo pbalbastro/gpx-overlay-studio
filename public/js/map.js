@@ -11,6 +11,9 @@ window.OV = window.OV || {};
 
 (function (OV) {
   const LIB = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js';
+  // Subresource Integrity (cdnjs's published hash): the browser refuses to run the
+  // script if the CDN ever serves anything else. Update it together with LIB.
+  const LIB_SRI = 'sha512-x8Bt/82VRs91xVTqHDpQ1t8c4qit3QCRbo9BVqnUsyw5yKqzvL4BAgcz7R34BDCiCwx9ypXPTnxPaNnazQz1ag==';
   const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
   const ATTRIBUTION = '© OpenFreeMap © OpenMapTiles © OpenStreetMap';
   const LAND = '#F1F0ED';
@@ -67,10 +70,12 @@ window.OV = window.OV || {};
 
   let mapReady = null;
 
-  function loadScript(src) {
+  function loadScript(src, integrity) {
     return new Promise((resolve, reject) => {
       const el = document.createElement('script');
       el.src = src;
+      el.integrity = integrity;
+      el.crossOrigin = 'anonymous';
       el.onload = resolve;
       el.onerror = () => reject(new Error(`Could not load ${src}`));
       document.head.appendChild(el);
@@ -80,7 +85,7 @@ window.OV = window.OV || {};
   function ensureMap() {
     if (mapReady) return mapReady;
     mapReady = (async () => {
-      if (!window.maplibregl) await loadScript(LIB);
+      if (!window.maplibregl) await loadScript(LIB, LIB_SRI);
       const style = stravaStyle(await (await fetch(STYLE)).json());
       const box = document.createElement('div');
       // Off screen but not display:none, so WebGL still renders.

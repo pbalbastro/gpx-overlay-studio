@@ -423,15 +423,6 @@ window.OV = window.OV || {};
       },
     },
     {
-      id: 'kl-classic',
-      name: 'KL Bisiklista Classic',
-      desc: 'Centered stats and route with the STRAVA | KL BISIKLISTA lockup.',
-      draw(ctx, W, H, d) {
-        classicLayout(ctx, W, H, d, [d.dist, d.pace, d.time],
-          (x, y, s) => OV.lockup(ctx, d, x, y, 60 * s, 'center', W * 0.9, 'kl'));
-      },
-    },
-    {
       id: 'ttrc-side',
       name: 'TTRC Side',
       desc: 'Route on the left, lockup and stat column on the right.',
@@ -484,6 +475,17 @@ window.OV = window.OV || {};
         OV.drawRoute(ctx, d.route, { x: cx - rw / 2, y: (H * 0.08 + 40 * s + rowTop) / 2 - rh / 2, w: rw, h: rh }, {
           width: 13 * s * d.rw, markers: true,
         });
+      },
+    },
+
+    // ---------- KL Bisiklista cycling club ----------
+    {
+      id: 'kl-classic',
+      name: 'KL Bisiklista Classic',
+      desc: 'Centered stats and route with the STRAVA | KL BISIKLISTA lockup.',
+      draw(ctx, W, H, d) {
+        classicLayout(ctx, W, H, d, [d.dist, d.pace, d.time],
+          (x, y, s) => OV.lockup(ctx, d, x, y, 60 * s, 'center', W * 0.9, 'kl'));
       },
     },
 
@@ -1156,18 +1158,18 @@ window.OV = window.OV || {};
 
   OV.templates = templates;
 
-  // Template tabs. A template belongs to the group its id starts with
-  // ("ttrc-classic" -> TTRC); everything else is in STRAVA.
+  // Template tabs, picked by the start of the template id (see PREFIX_GROUP);
+  // everything else is in STRAVA.
   OV.groups = [
     { id: 'strava', name: 'STRAVA' },
-    { id: 'ttrc', name: 'TTRC' },
-    { id: 'kl', name: 'BISIKLISTA' },
-    { id: 'apimycc', name: 'APIMYCC' },
+    { id: 'clubs', name: 'CLUBS' },
     { id: 'white', name: 'WHITE' },
     { id: 'map', name: 'MAP' },
   ];
+  // Template id prefix -> tab. The club layouts (TTRC, KL Bisiklista, APIMYCC) share CLUBS.
+  const PREFIX_GROUP = { ttrc: 'clubs', kl: 'clubs', apimycc: 'clubs', white: 'white', map: 'map' };
   for (const t of templates) {
-    const g = OV.groups.find((grp) => grp.id !== 'strava' && t.id.startsWith(`${grp.id}-`));
-    t.group = g ? g.id : 'strava';
+    const prefix = (t.id.match(/^([a-z]+)-/) || [])[1]; // "ttrc-side" -> ttrc; "map" has none
+    t.group = PREFIX_GROUP[prefix] || 'strava';
   }
 })(window.OV);

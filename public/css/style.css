@@ -233,6 +233,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
 .ghost { background: transparent; color: var(--orange); }
 .ghost:hover { background: var(--orange-dim); }
 .actions button:disabled { opacity: 0.5; cursor: progress; }
+#copyPng { display: none; } /* phones only */
 
 .templates h3 {
   margin: 0 0 12px;
@@ -332,6 +333,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
   .preview-bar { margin-top: 0; }
   .preview-bar > div:first-child { display: none; }
   .actions button { padding: 12px; }
+  #copyPng:not([hidden]) { display: block; }
   .templates { display: flex; flex-direction: column; }
   .templates h3 { margin: 4px 0 10px; }
   .tabs,

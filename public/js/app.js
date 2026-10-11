@@ -367,6 +367,20 @@
     }
   }
 
+  // Puts the selected overlay on the clipboard as a transparent PNG (paste it into an
+  // Instagram story as a sticker). The ClipboardItem must be created during the tap,
+  // so it gets the PNG as a promise: the ready-made one if there is one.
+  async function copyPNG() {
+    const tpl = tplById(state.selected);
+    const png = state.files.get(tpl.id) || renderFile(tpl);
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': Promise.resolve(png) })]);
+      flash('copyPng', 'Copied!');
+    } catch (e) {
+      flash('copyPng', 'Copy failed');
+    }
+  }
+
   function flash(id, msg) {
     const btn = $(id);
     const label = btn.dataset.label || (btn.dataset.label = btn.textContent);
@@ -412,6 +426,11 @@
       $('download').addEventListener('click', () => saveToPhotos([tplById(state.selected)], 'download'));
     } else {
       $('download').addEventListener('click', () => exportPNG(tplById(state.selected)));
+    }
+    // Copy to clipboard (phones only, see style.css), where the browser can copy images.
+    if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+      $('copyPng').hidden = false;
+      $('copyPng').addEventListener('click', copyPNG);
     }
     // The note under the save buttons always shows; with the share sheet it explains
     // the Photos step, otherwise the plain download.

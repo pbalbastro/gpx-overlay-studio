@@ -53,32 +53,13 @@
         </label>
 
         <h3>Units</h3>
-        <div class="two">
-          <label>Units
-            <select id="units">
-              <option value="km">Kilometers</option>
-              <option value="mi">Miles</option>
-            </select>
-          </label>
-          <label>Show
-            <select id="metric">
-              <option value="auto">Auto</option>
-              <option value="pace">Pace</option>
-              <option value="speed">Speed</option>
-            </select>
-          </label>
-        </div>
+        <select id="units" aria-label="Units">
+          <option value="km">Kilometers</option>
+          <option value="mi">Miles</option>
+        </select>
         <label>Activity title
           <input type="text" id="title" placeholder="Auto (e.g. Morning Run)" />
         </label>
-        <div class="two">
-          <label>Avg power (W)
-            <input type="number" id="power" min="0" inputmode="numeric" placeholder="From file" />
-          </label>
-          <label>Calories
-            <input type="number" id="calories" min="0" inputmode="numeric" placeholder="Optional" />
-          </label>
-        </div>
 
         <h3>Style</h3>
         <label class="check"><input type="checkbox" id="shadow" checked /> Soft text shadow</label>
@@ -102,13 +83,11 @@
         <div class="preview-bar">
           <div>
             <h2 id="tplName"></h2>
-            <p id="tplDesc"></p>
           </div>
           <div class="actions">
             <button type="button" class="primary" id="download">Download PNG</button>
-            <button type="button" class="ghost" id="downloadAll">Download all</button>
           </div>
-          <p class="hint" id="iosHint" hidden>Tap <b>Save to Photos</b>, then <b>Save Image</b>. The PNG stays transparent. The Photos app shows clear areas as white or black, but the overlay will sit over your photo in Instagram Stories.</p>
+          <p class="hint" id="saveHint">PNGs download with a transparent background, so the overlay sits over your photo in Instagram Stories.</p>
         </div>
       </div>
       <div class="templates">

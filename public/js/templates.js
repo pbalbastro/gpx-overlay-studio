@@ -393,8 +393,10 @@ window.OV = window.OV || {};
         const s = W / 1080, cx = W / 2;
         const short = H / W < 1.5;
         const layers = 20, step = (short ? 11 : 15) * s;
+        // Always the thinnest route (the Route thickness slider's minimum, 0.5x), not
+        // the slider value: thin layers keep the ribbon's grooves crisp.
         stackedRoute(ctx, d.route, { x: W * 0.14, y: H * 0.07, w: W * 0.72, h: H * (short ? 0.5 : 0.52) },
-          layers, step, 32 * s * d.rw, 4 * s);
+          layers, step, 32 * s * 0.5, 4 * s);
 
         // Big italic distance, then elevation / time / pace in a row spanning its width.
         const up = (str) => str.replace(/\s+/g, '').toUpperCase();
@@ -745,7 +747,7 @@ window.OV = window.OV || {};
     {
       id: 'map-card-stats',
       name: 'Feed Card Stats',
-      desc: 'Feed Card with six stats like the Strava stat screen: power from the file, calories from the panel.',
+      desc: 'Feed Card with six stats like the Strava stat screen: power from the file, calories from Strava.',
       draw(ctx, W, H, d) {
         const c = stravaCells(d);
         feedCard(ctx, W, H, d, [[c.dist, c.pace, c.time], [c.elev, c.power, c.calories]]);
@@ -841,7 +843,7 @@ window.OV = window.OV || {};
   }
 
   // The six stats on Strava's stat screen, as { label, value }. Power comes from the
-  // file and calories from the side panel; when either is missing, another stat the
+  // file and calories from Strava; when either is missing, another stat the
   // file does have (heart rate, cadence, best split, elapsed time) takes its place.
   function stravaCells(d) {
     const extras = [

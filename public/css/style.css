@@ -162,6 +162,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .controls label { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; font-weight: 600; }
 .controls .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.controls > select { margin-bottom: 10px; } /* a select without a label wrapper */
 .controls select, .controls input[type="text"], .controls input[type="number"] {
   width: 100%;
   background: #111113;
@@ -269,14 +270,6 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
 }
 .thumb-wrap { display: flex; flex-direction: column; gap: 8px; }
 .thumb-wrap[hidden] { display: none; }
-.thumb-save {
-  display: none;
-  border: 0;
-  border-radius: 10px;
-  padding: 10px 8px;
-  font-weight: 700;
-  cursor: pointer;
-}
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -314,8 +307,55 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
   .layout { grid-template-columns: 1fr; padding: 16px; }
   .panel { position: static; max-height: none; }
   .top { padding: 14px 16px; }
-  /* Phones: no large preview; the selected thumbnail gets its own save button. */
-  .preview, .preview-bar > div:first-child, #download { display: none; }
+  .info { display: none; } /* activity details card: the templates show the same stats */
+  /* Grid items default to min-width: auto, which lets the long carousel row widen the
+     whole page instead of scrolling inside itself. */
+  .layout > *,
+  .templates { min-width: 0; }
+
+  /* Phones: the editor fills one screen. The "Templates" title, one swipeable row of
+     tabs, then a swipe carousel: the middle card is the selected template, shown
+     large, with its neighbours shrunk and faded beside it (sizes set in app.js).
+     The save buttons sit below the carousel. */
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch; /* desktop's align-items: start would size rows to their content */
+    justify-content: center; /* keep title, tabs, carousel and buttons together */
+    gap: 10px;
+    height: 100vh;
+    height: 100dvh;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  .preview { display: none; }
+  .preview-col { order: 1; } /* below the carousel */
   .preview-bar { margin-top: 0; }
-  .thumb-wrap.active .thumb-save { display: block; }
+  .preview-bar > div:first-child { display: none; }
+  .actions button { padding: 12px; }
+  .templates { display: flex; flex-direction: column; }
+  .templates h3 { margin: 4px 0 10px; }
+  .tabs,
+  .grid { scrollbar-width: none; }
+  .tabs::-webkit-scrollbar,
+  .grid::-webkit-scrollbar { display: none; }
+  .tabs { position: relative; flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 8px; padding: 0 16px; }
+  .tab { flex: 0 0 auto; padding: 6px 12px; font-size: 13px; }
+  .grid {
+    /* Card width: 70% of the screen, or less if a card that wide would be too tall.
+       --ar is the canvas width / height, set by app.js. Neighbours overlap by
+       --tuck so their shrunken versions sit close beside the middle card. */
+    --card-w: min(70vw, calc((100dvh - 260px) * var(--ar, 0.5625)));
+    --tuck: calc(var(--card-w) * 0.1);
+    position: relative; /* card offsets are measured against the carousel */
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin: 0 -16px;
+    /* lets the first and last cards reach the middle */
+    padding: 14px calc(50vw - var(--card-w) / 2 + var(--tuck)) 6px;
+  }
+  .thumb-wrap { flex: 0 0 var(--card-w); margin: 0 calc(-1 * var(--tuck)); scroll-snap-align: center; }
+  .thumb span { text-align: center; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }

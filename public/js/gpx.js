@@ -210,14 +210,14 @@ window.OV = window.OV || {};
     dist.value = `${dist.num} ${uName}`;
 
     const isRide = /bik|cycl|ride/i.test(meta.type || '');
-    const useSpeed = opts.metric === 'speed' || (opts.metric === 'auto' && isRide);
+    const useSpeed = isRide; // rides show speed, everything else pace
     const mt = st.movingTime;
     const speedUnit = mi ? 'mph' : 'km/h';
     const speedNum = mt ? num(distU / (mt / 3600), 1) : '\u2014';
     const speed = { label: L.speed, num: speedNum, unit: speedUnit, value: mt ? `${speedNum} ${speedUnit}` : '\u2014' };
     const paceNum = mt ? fmtPace(mt / distU) : '\u2014';
     const runPace = { label: L.pace, num: paceNum, unit: `/${uName}`, value: mt ? `${paceNum}/${uName}` : '\u2014' };
-    // `pace` follows the Pace/Speed setting; `speed` is always speed (for ride layouts).
+    // `pace` is speed for rides and pace otherwise; `speed` is always speed (ride layouts).
     const pace = useSpeed ? speed : runPace;
 
     const time = { label: L.time, value: fmtDuration(mt, L), clock: fmtClock(mt) };
@@ -251,9 +251,9 @@ window.OV = window.OV || {};
       unit: isRide ? 'rpm' : 'spm',
     } : null;
 
-    // Power comes from the file (or the panel override); calories only from the panel,
-    // since GPX files don't carry them.
-    const watts = opts.power || st.avgPower;
+    // Power comes from the file (or Strava); calories only from Strava, since GPX files
+    // don't carry them.
+    const watts = st.avgPower;
     const power = watts ? { label: 'Avg Power', value: `${Math.round(watts)} W` } : null;
     const calories = opts.calories ? { label: 'Calories', value: `${Math.round(opts.calories)} Cal` } : null;
 

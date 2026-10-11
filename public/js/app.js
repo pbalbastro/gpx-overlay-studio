@@ -3,6 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const SIZES = { story: [1080, 1920], portrait: [1080, 1350], square: [1080, 1080] };
   const THUMB_W = 320;
+  const PHONE_THUMB_W = 540; // phone carousel cards are shown large
 
   const state = {
     meta: null,
@@ -19,10 +20,8 @@
     return {
       size: $('size').value,
       units: $('units').value,
-      metric: $('metric').value,
       title: $('title').value.trim(),
-      power: parseFloat($('power').value) || null,
-      calories: parseFloat($('calories').value) || null,
+      calories: state.calories, // only Strava activities carry calories
       shadow: $('shadow').checked,
       routeWidth: parseFloat($('routeWidth').value),
       includeBg: $('includeBg').checked,
@@ -89,10 +88,11 @@
     try { localStorage.setItem('ov-group', id); } catch (e) { /* not persisted */ }
     applyGroup();
     renderAll();
+    centerSelected(false);
   }
 
-  // Each thumbnail is a wrapper holding the select button and, on phones, a save
-  // button that appears under the selected thumbnail (the large preview is hidden there).
+  // On phones the grid is a swipe carousel under the preview (see style.css): the
+  // card that settles in the middle is the selected template.
   function buildGrid() {
     const grid = $('grid');
     for (const t of OV.templates) {
@@ -102,19 +102,80 @@
       wrap.innerHTML = `
         <button type="button" class="thumb">
           <div class="thumb-canvas checker"><canvas></canvas></div><span>${t.name}</span>
-        </button>
-        <button type="button" class="thumb-save primary" id="save-${t.id}">
-          ${shareMode ? 'Save to Photos' : 'Download PNG'}
         </button>`;
-      wrap.querySelector('.thumb').addEventListener('click', () => select(t.id));
-      wrap.querySelector('.thumb-save').addEventListener('click', () =>
-        shareMode ? saveToPhotos([t], `save-${t.id}`) : exportPNG(t));
+      // On phones, tapping a card slides it to the middle, which selects it.
+      wrap.querySelector('.thumb').addEventListener('click', () =>
+        (isPhoneLayout() ? centerCard(wrap, true) : select(t.id)));
       grid.appendChild(wrap);
       state.thumbs.set(t.id, wrap);
     }
   }
 
   const isPhoneLayout = () => window.matchMedia('(max-width: 760px)').matches;
+
+  // ---------- phone carousel ----------
+
+  // Scrolls a horizontal strip (carousel or tabs) so `el` sits in its middle. Only the
+  // strip scrolls, never the page.
+  function centerIn(strip, el, smooth) {
+    strip.scrollTo({ left: el.offsetLeft + el.offsetWidth / 2 - strip.clientWidth / 2, behavior: smooth ? 'smooth' : 'auto' });
+  }
+
+  const centerCard = (el, smooth) => centerIn($('grid'), el, smooth);
+
+  // Brings the selected card and the active tab into view.
+  const centerSelected = (smooth) => {
+    if (!isPhoneLayout()) return;
+    centerCard(state.thumbs.get(state.selected), smooth);
+    const tab = $('tabs').querySelector('.tab.active');
+    if (tab) centerIn($('tabs'), tab, smooth);
+    shapeCarousel();
+  };
+
+  // Cover-flow sizing: a card is full size in the middle and shrinks and fades as it
+  // moves a card-width away, following the finger while swiping. Off on desktop.
+  function shapeCarousel() {
+    const phone = isPhoneLayout();
+    const grid = $('grid');
+    const mid = grid.scrollLeft + grid.clientWidth / 2;
+    for (const el of state.thumbs.values()) {
+      if (!phone || el.hidden) {
+        el.style.transform = el.style.opacity = el.style.zIndex = '';
+        continue;
+      }
+      const f = Math.min(1, Math.abs(el.offsetLeft + el.offsetWidth / 2 - mid) / el.offsetWidth);
+      el.style.transform = `scale(${1 - 0.28 * f})`;
+      el.style.opacity = String(1 - 0.5 * f);
+      el.style.zIndex = String(100 - Math.round(100 * f)); // the middle card sits on top
+    }
+  }
+
+  // Once a swipe settles, select the card nearest the middle.
+  function wireCarousel() {
+    const grid = $('grid');
+    let timer = 0, frame = 0;
+    grid.addEventListener('scroll', () => {
+      if (!isPhoneLayout()) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(shapeCarousel);
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const mid = grid.scrollLeft + grid.clientWidth / 2;
+        let best = null, dist = Infinity;
+        for (const [id, el] of state.thumbs) {
+          if (el.hidden) continue;
+          const d = Math.abs(el.offsetLeft + el.offsetWidth / 2 - mid);
+          if (d < dist) { dist = d; best = id; }
+        }
+        if (best && best !== state.selected) select(best);
+      }, 120);
+    }, { passive: true });
+    window.matchMedia('(max-width: 760px)').addEventListener('change', () => {
+      renderAll();
+      centerSelected(false);
+      shapeCarousel();
+    });
+  }
 
   function select(id) {
     state.selected = id;
@@ -136,10 +197,9 @@
     const opts = readOpts();
     const [W, H] = SIZES[opts.size];
     const tpl = tplById(state.selected);
-    // The large preview is hidden on phones, so skip the full-size render there.
+    // Phones have no large preview: the carousel's middle card is the preview.
     if (!isPhoneLayout()) paint($('preview'), tpl, W, H, currentData(opts), opts, state.bg);
     $('tplName').textContent = tpl.name;
-    $('tplDesc').textContent = tpl.desc;
     $('previewBox').style.aspectRatio = `${W} / ${H}`;
     invalidateFiles();
   }
@@ -149,10 +209,12 @@
     const opts = readOpts();
     const [W, H] = SIZES[opts.size];
     const d = currentData(opts);
+    const tw = isPhoneLayout() ? PHONE_THUMB_W : THUMB_W;
+    $('grid').style.setProperty('--ar', String(W / H)); // phone card size (style.css)
     for (const t of groupTemplates()) {
       const el = state.thumbs.get(t.id);
       el.querySelector('.thumb-canvas').style.aspectRatio = `${W} / ${H}`;
-      paint(el.querySelector('canvas'), t, THUMB_W, Math.round((THUMB_W * H) / W), d, opts, state.bg);
+      paint(el.querySelector('canvas'), t, tw, Math.round((tw * H) / W), d, opts, state.bg);
     }
     renderPreview();
     renderInfo(d);
@@ -192,12 +254,7 @@
     $('error').textContent = '';
     $('title').value = '';
     $('title').placeholder = meta.name || 'Auto (e.g. Morning Run)';
-    // Power and calories hints come from the activity; manual values are per activity.
-    const from = source === 'strava' ? 'Strava' : 'file';
-    $('power').value = '';
-    $('calories').value = extras.calories ? String(Math.round(extras.calories)) : '';
-    $('power').placeholder = stats.avgPower ? `${Math.round(stats.avgPower)} (${from})` : `Not in ${from}`;
-    if (source !== 'demo' && /bik|cycl|ride/i.test(meta.type)) $('metric').value = 'auto';
+    state.calories = extras.calories || null;
     renderAll();
   }
 
@@ -214,6 +271,7 @@
       }
       try {
         loadGPXText(reader.result, false);
+        showStage();
       } catch (e) {
         err.textContent = e.message;
       }
@@ -268,7 +326,8 @@
   }
 
   // iOS only opens the share sheet during a tap, and rendering a PNG takes too long to
-  // do after the tap, so overlays are rendered ahead of time whenever the preview changes.
+  // do after the tap, so the selected overlay is rendered ahead of time whenever the
+  // preview changes.
   let prepToken = 0;
   function invalidateFiles() {
     prepToken++;
@@ -279,13 +338,9 @@
 
   async function prepareFiles() {
     const token = ++prepToken;
-    const selected = tplById(state.selected);
-    for (const t of [selected, ...groupTemplates().filter((t) => t !== selected)]) {
-      const f = await renderFile(t);
-      if (token !== prepToken) return;
-      state.files.set(t.id, f);
-      await new Promise((r) => setTimeout(r, 0));
-    }
+    const t = tplById(state.selected);
+    const f = await renderFile(t);
+    if (token === prepToken) state.files.set(t.id, f);
   }
 
   const canShareFiles = () => {
@@ -317,16 +372,6 @@
     const label = btn.dataset.label || (btn.dataset.label = btn.textContent);
     btn.textContent = msg;
     setTimeout(() => { btn.textContent = label; }, 1600);
-  }
-
-  async function exportAll() {
-    const btn = $('downloadAll');
-    btn.disabled = true;
-    for (const t of groupTemplates()) {
-      await exportPNG(t);
-      await new Promise((r) => setTimeout(r, 300));
-    }
-    btn.disabled = false;
   }
 
   function wire() {
@@ -364,14 +409,16 @@
 
     if (shareMode) {
       $('download').textContent = 'Save to Photos';
-      $('downloadAll').textContent = 'Save all to Photos';
       $('download').addEventListener('click', () => saveToPhotos([tplById(state.selected)], 'download'));
-      $('downloadAll').addEventListener('click', () => saveToPhotos(groupTemplates(), 'downloadAll'));
     } else {
       $('download').addEventListener('click', () => exportPNG(tplById(state.selected)));
-      $('downloadAll').addEventListener('click', exportAll);
     }
-    if (shareMode) $('iosHint').hidden = false;
+    // The note under the save buttons always shows; with the share sheet it explains
+    // the Photos step, otherwise the plain download.
+    if (shareMode) {
+      $('saveHint').innerHTML = 'Tap <b>Save to Photos</b>, then <b>Save Image</b>. The PNG stays transparent. ' +
+        'The Photos app shows clear areas as white or black, but the overlay will sit over your photo in Instagram Stories.';
+    }
   }
 
   async function loadFonts() {
@@ -383,19 +430,25 @@
     await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 3000))]).catch(() => {});
   }
 
+  // On phones the editor is below the settings panel; bring it into view.
+  function showStage() {
+    if (isPhoneLayout()) document.querySelector('.stage').scrollIntoView({ behavior: 'smooth' });
+  }
+
   async function init() {
     OV.onMapUpdate = scheduleRender; // repaint as map tiles arrive
     buildGrid();
     buildTabs();
     wire();
+    wireCarousel();
     await Promise.all([loadFonts(), OV.loadLogos()]);
     loadGPXText(OV.demoGPX(), true);
     select(state.selected);
+    centerSelected(false);
     OV.initStrava({
       onActivity: ({ meta, stats, calories }) => {
         setActivity(meta, stats, 'strava', { calories });
-        // On phones the templates are below the panel; bring them into view.
-        if (isPhoneLayout()) document.querySelector('.templates').scrollIntoView({ behavior: 'smooth' });
+        showStage();
       },
       onError: (msg) => { $('error').textContent = msg; },
     });

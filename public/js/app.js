@@ -378,7 +378,8 @@
     if (!document.fonts) return;
     const loads = [500, 600, 700, 800, 900].map((w) => document.fonts.load(`${w} 40px "Montserrat"`))
       .concat([500, 600].map((w) => document.fonts.load(`${w} 40px "Barlow Condensed"`)))
-      .concat([300, 400, 600].map((w) => document.fonts.load(`${w} 40px "Inter"`)));
+      .concat([300, 400, 600].map((w) => document.fonts.load(`${w} 40px "Inter"`)))
+      .concat([400, 700].map((w) => document.fonts.load(`${w} 40px "Gaegu"`)));
     await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 3000))]).catch(() => {});
   }
 

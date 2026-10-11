@@ -385,6 +385,31 @@ window.OV = window.OV || {};
       },
     },
 
+    {
+      id: 'stacked',
+      name: 'Stacked Route',
+      desc: 'The route repeated in fading layers like an extruded ribbon, with a big italic distance.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const short = H / W < 1.5;
+        const layers = 20, step = (short ? 11 : 15) * s;
+        stackedRoute(ctx, d.route, { x: W * 0.14, y: H * 0.07, w: W * 0.72, h: H * (short ? 0.5 : 0.52) },
+          layers, step, 32 * s * d.rw, 4 * s);
+
+        // Big italic distance, then elevation / time / pace in a row spanning its width.
+        const up = (str) => str.replace(/\s+/g, '').toUpperCase();
+        const big = up(`${d.dist.num}${d.dist.unit}`);
+        const size = Math.min(210 * s, (210 * s * W * 0.86) / measureItalic(ctx, big, 210 * s));
+        const y = H * (short ? 0.68 : 0.64);
+        const bw = italicText(ctx, big, cx, y, size, 'center');
+        const rowY = y + 80 * s, rs = 44 * s;
+        italicText(ctx, up(d.elev.value), cx - bw / 2 + 10 * s, rowY, rs, 'left');
+        italicText(ctx, d.time.clock, cx, rowY, rs, 'center');
+        italicText(ctx, up(`${d.pace.num}${d.pace.unit}`), cx + bw / 2 - 10 * s, rowY, rs, 'right');
+        OV.wordmark(ctx, d, cx, H - 90 * s, 34 * s);
+      },
+    },
+
     // ---------- TTRC running club ----------
     {
       id: 'ttrc-classic',
@@ -658,37 +683,58 @@ window.OV = window.OV || {};
       },
     },
 
+    {
+      id: 'white-echo',
+      name: 'Echo',
+      desc: 'Big italic distance echoed downward in fading outlines, with the stats on top.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const up = (str) => str.replace(/\s+/g, '').toUpperCase();
+        const big = up(`${d.dist.num}${d.dist.unit}`);
+        const size = Math.min(230 * s, (230 * s * W * 0.84) / measureItalic(ctx, big, 230 * s));
+        const bw = measureItalic(ctx, big, size);
+        // Elevation / time / pace across the distance's width, above it.
+        const rowY = H * 0.07 + 34 * s, rs = 46 * s;
+        italicText(ctx, up(d.elev.value), cx - bw / 2 + 10 * s, rowY, rs, 'left');
+        italicText(ctx, d.time.clock, cx, rowY, rs, 'center');
+        italicText(ctx, up(`${d.pace.num}${d.pace.unit}`), cx + bw / 2 - 10 * s, rowY, rs, 'right');
+        echoText(ctx, big, cx, rowY + 30 * s + size * 0.74, size, 3, size * 0.5, 5 * s, 3.5 * s);
+      },
+    },
+
+    {
+      id: 'white-sketch',
+      name: 'Sketch',
+      desc: 'The route as a hand-drawn white line, with the stats in handwriting below.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const short = H / W < 1.5;
+        const rw = W * 0.68, top = H * (short ? 0.08 : 0.1), rh = H * (short ? 0.6 : 0.56);
+        sketchRoute(ctx, d.route, { x: cx - rw / 2, y: top, w: rw, h: rh }, 7 * s * d.rw, s);
+        const y = H * (short ? 0.88 : 0.87);
+        const cells = [
+          `${d.dist.num}${d.dist.unit}`,
+          d.elev.value.replace(/\s+/g, ''),
+          d.time.clock,
+        ];
+        cells.forEach((c, i) => OV.text(ctx, c, cx + (i - 1) * W * 0.27, y, {
+          size: 58 * s, weight: 700, family: OV.HAND, spacing: 4 * s, alpha: 0.92, maxWidth: W * 0.25,
+        }));
+      },
+    },
+
     // ---------- Map: a real street map under the route (js/map.js), Strava app style ----------
     {
       id: 'map-activity',
       name: 'Activity Page',
       desc: 'Like the Strava activity screen: map on top, white sheet with title and stats.',
-      draw(ctx, W, H, d) {
-        const s = W / 1080;
-        const sheetY = H * (H / W < 1.5 ? 0.56 : 0.66);
-        const r = 40 * s;
-        OV.drawMap(ctx, d.route, { x: 0, y: 0, w: W, h: sheetY + r }, {
-          inner: { x: W * 0.1, y: Math.max(H * 0.06, 90 * s), w: W * 0.8, h: sheetY - Math.max(H * 0.06, 90 * s) - 80 * s },
-          width: 9 * d.rw,
-        });
-        ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.18)';
-        ctx.shadowBlur = 30 * s;
-        ctx.fillStyle = '#FFFFFF';
-        OV.roundRect(ctx, 0, sheetY, W, H - sheetY + r, r);
-        ctx.fill();
-        ctx.restore();
-
-        noShadow(ctx, () => {
-          const x = 70 * s;
-          let y = sheetY + 110 * s;
-          OV.wordmark(ctx, d, x, y - 4 * s, 26 * s, 'left', ORANGE);
-          y += 90 * s;
-          OV.text(ctx, d.name, x, y, { size: 56 * s, weight: 600, family: OV.INTER, color: OV.MAP_TEXT, align: 'left', maxWidth: W - 2 * x });
-          if (d.date) OV.text(ctx, d.date, x, y + 50 * s, { size: 28 * s, weight: 400, family: OV.INTER, color: OV.MAP_MUTED, align: 'left' });
-          mapStats(ctx, [d.dist, d.pace, d.time], x, W - 2 * x, y + 140 * s, 26 * s, 54 * s, 'left');
-        });
-      },
+      draw(ctx, W, H, d) { activityPage(ctx, W, H, d, false); },
+    },
+    {
+      id: 'map-activity-3d',
+      name: 'Activity Page 3D',
+      desc: 'Activity Page with a tilted 3D satellite map: real terrain, with the route draped over it.',
+      draw(ctx, W, H, d) { activityPage(ctx, W, H, d, true); },
     },
     {
       id: 'map-card',
@@ -762,6 +808,36 @@ window.OV = window.OV || {};
     ctx.shadowColor = 'transparent';
     fn();
     ctx.restore();
+  }
+
+  // Strava activity screen: the map on top (flat, or tilted 3D with terrain), then a
+  // white sheet with the wordmark, title, date and three stats.
+  function activityPage(ctx, W, H, d, three) {
+    const s = W / 1080;
+    const sheetY = H * (H / W < 1.5 ? 0.56 : 0.66);
+    const r = 40 * s;
+    OV.drawMap(ctx, d.route, { x: 0, y: 0, w: W, h: sheetY + r }, {
+      inner: { x: W * 0.1, y: Math.max(H * 0.06, 90 * s), w: W * 0.8, h: sheetY - Math.max(H * 0.06, 90 * s) - 80 * s },
+      width: 9 * d.rw,
+      three,
+    });
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+    ctx.shadowBlur = 30 * s;
+    ctx.fillStyle = '#FFFFFF';
+    OV.roundRect(ctx, 0, sheetY, W, H - sheetY + r, r);
+    ctx.fill();
+    ctx.restore();
+
+    noShadow(ctx, () => {
+      const x = 70 * s;
+      let y = sheetY + 110 * s;
+      OV.wordmark(ctx, d, x, y - 4 * s, 26 * s, 'left', ORANGE);
+      y += 90 * s;
+      OV.text(ctx, d.name, x, y, { size: 56 * s, weight: 600, family: OV.INTER, color: OV.MAP_TEXT, align: 'left', maxWidth: W - 2 * x });
+      if (d.date) OV.text(ctx, d.date, x, y + 50 * s, { size: 28 * s, weight: 400, family: OV.INTER, color: OV.MAP_MUTED, align: 'left' });
+      mapStats(ctx, [d.dist, d.pace, d.time], x, W - 2 * x, y + 140 * s, 26 * s, 54 * s, 'left');
+    });
   }
 
   // The six stats on Strava's stat screen, as { label, value }. Power comes from the
@@ -930,6 +1006,130 @@ window.OV = window.OV || {};
       y += 34 * s;
     }
     OV.stack(ctx, items, x, y, o);
+  }
+
+  // The route drawn `n` times, each copy `step` lower and fainter, top copy in front,
+  // like an extruded ribbon. A thin ring is erased around each copy before it is
+  // drawn, so the grooves between layers are transparent and show the photo.
+  function stackedRoute(ctx, route, box, n, step, width, gap) {
+    if (!route || route.length < 2) return;
+    const off = document.createElement('canvas');
+    off.width = ctx.canvas.width;
+    off.height = ctx.canvas.height;
+    const o = off.getContext('2d');
+    const view = OV.routeView(route, box);
+    for (let i = n - 1; i >= 0; i--) {
+      const f = i / (n - 1); // 0 = front (top), 1 = back (bottom)
+      const v = { ...view, oy: view.oy + i * step };
+      o.globalCompositeOperation = 'destination-out';
+      o.globalAlpha = 1;
+      OV.drawRoute(o, route, box, { view: v, width: width + 2 * gap, color: '#000' });
+      o.globalCompositeOperation = 'source-over';
+      o.globalAlpha = 1 - 0.92 * Math.pow(f, 1.3);
+      // Deeper layers also darken a little, toward burnt orange.
+      const k = f * 0.45;
+      OV.drawRoute(o, route, box, { view: v, width, color: `rgb(${Math.round(252 - 130 * k)},${Math.round(76 - 46 * k)},2)` });
+    }
+    ctx.drawImage(off, 0, 0);
+  }
+
+  // The route as a white pen line: a gentle wobble along its length, plus a fainter
+  // second pass slightly off the first, like ink that went over the line twice.
+  function sketchRoute(ctx, route, box, width, s) {
+    if (!route || route.length < 2) return;
+    const pts = OV.fitRoute(route, box);
+    const pass = (amp, phase, w, alpha) => {
+      let len = 0;
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+        const dx = b.x - a.x, dy = b.y - a.y, n = Math.hypot(dx, dy) || 1;
+        if (i) len += Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
+        // Smooth wobble: two slow waves along the line, in reference px.
+        const t = len / s;
+        const off = amp * s * (Math.sin(t / 37 + phase) + 0.6 * Math.sin(t / 13 + phase * 2.3));
+        const x = p.x - (dy / n) * off, y = p.y + (dx / n) * off;
+        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      });
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = WHITE;
+      ctx.lineWidth = w;
+      ctx.globalAlpha = alpha;
+      ctx.stroke();
+      ctx.restore();
+    };
+    pass(1.6, 0, width, 1);
+    pass(2.4, 1.7, width * 0.45, 0.45);
+  }
+
+  // `str` in heavy italic with `n` echoes below it, each `step` lower: white outlines
+  // with a fading fill, fainter with depth, front copy solid white. As in
+  // stackedRoute, a ring is erased around each copy so the echoes read as layers.
+  function echoText(ctx, str, x, y, size, n, step, gap, outline) {
+    const off = document.createElement('canvas');
+    off.width = ctx.canvas.width;
+    off.height = ctx.canvas.height;
+    const o = off.getContext('2d');
+    o.font = ITALIC(size);
+    o.textAlign = 'center';
+    o.lineJoin = 'round';
+    for (let i = n; i >= 0; i--) {
+      const yy = y + i * step, a = 1 - i / (n + 1);
+      o.globalCompositeOperation = 'destination-out';
+      o.globalAlpha = 1;
+      o.fillStyle = o.strokeStyle = '#000';
+      o.lineWidth = 2 * (gap + outline);
+      o.strokeText(str, x, yy);
+      o.fillText(str, x, yy);
+      o.globalCompositeOperation = 'source-over';
+      if (!i) {
+        o.fillStyle = WHITE;
+        o.fillText(str, x, yy);
+        continue;
+      }
+      // Outline: stroke at double width, then cut the letter shapes out, leaving only
+      // the outer half. (Stroking alone also traces the glyphs' overlapping inner
+      // contours.)
+      o.globalAlpha = a;
+      o.strokeStyle = WHITE;
+      o.lineWidth = 2 * outline;
+      o.strokeText(str, x, yy);
+      o.globalCompositeOperation = 'destination-out';
+      o.globalAlpha = 1;
+      o.fillStyle = '#000';
+      o.fillText(str, x, yy);
+      o.globalCompositeOperation = 'source-over';
+      const g = o.createLinearGradient(0, yy - size * 0.72, 0, yy);
+      g.addColorStop(0, `rgba(255,255,255,${0.5 * a})`);
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      o.fillStyle = g;
+      o.fillText(str, x, yy);
+    }
+    ctx.drawImage(off, 0, 0);
+  }
+
+  const ITALIC = (size) => `italic 900 ${size.toFixed(1)}px "Montserrat", "Helvetica Neue", Arial, sans-serif`;
+
+  function measureItalic(ctx, str, size) {
+    ctx.save();
+    ctx.font = ITALIC(size);
+    const w = ctx.measureText(str).width;
+    ctx.restore();
+    return w;
+  }
+
+  // Heavy italic white text (the browser slants Montserrat Black); returns its width.
+  function italicText(ctx, str, x, y, size, align) {
+    ctx.save();
+    ctx.font = ITALIC(size);
+    ctx.fillStyle = WHITE;
+    ctx.textAlign = align;
+    ctx.fillText(str, x, y);
+    const w = ctx.measureText(str).width;
+    ctx.restore();
+    return w;
   }
 
   // Centered stat stack, then the route, then a logo line (`footer`). The route gets

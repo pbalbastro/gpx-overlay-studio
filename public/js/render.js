@@ -9,6 +9,8 @@ window.OV = window.OV || {};
   const CONDENSED = '"Barlow Condensed", "Arial Narrow", sans-serif';
   // Clean grotesque close to the Strava app's stat screen (Strava Stats).
   const INTER = '"Inter", "Helvetica Neue", Arial, sans-serif';
+  // Rounded handwriting (Sketch); Apple's Chalkboard is the look it stands in for.
+  const HAND = '"Gaegu", "Chalkboard SE", "Comic Sans MS", cursive';
 
   function font(ctx, size, weight, family = FONT) {
     ctx.font = `${weight} ${Math.max(1, size).toFixed(1)}px ${family}`;
@@ -517,7 +519,7 @@ window.OV = window.OV || {};
   }
 
   Object.assign(OV, {
-    WHITE, ORANGE, CONDENSED, INTER, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
-    drawRoute, drawProfile, roundRect, drawCover, routeView,
+    WHITE, ORANGE, CONDENSED, INTER, HAND, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
+    drawRoute, drawProfile, roundRect, drawCover, routeView, fitRoute,
   });
 })(window.OV);

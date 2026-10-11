@@ -15,7 +15,14 @@ window.OV = window.OV || {};
   // script if the CDN ever serves anything else. Update it together with LIB.
   const LIB_SRI = 'sha512-x8Bt/82VRs91xVTqHDpQ1t8c4qit3QCRbo9BVqnUsyw5yKqzvL4BAgcz7R34BDCiCwx9ypXPTnxPaNnazQz1ag==';
   const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
-  const ATTRIBUTION = '© OpenFreeMap © OpenMapTiles © OpenStreetMap';
+  const ATTRIBUTION = '\u00A9 OpenFreeMap \u00A9 OpenMapTiles \u00A9 OpenStreetMap';
+  // Elevation for the 3D maps: open Terrarium tiles (Mapzen terrain on AWS Open Data).
+  const TERRAIN = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+  // Satellite imagery for the 3D maps: Esri World Imagery (no key; attribution required).
+  const SATELLITE = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  const ATTRIBUTION_3D = 'Imagery \u00A9 Esri, Maxar, Earthstar Geographics \u00B7 \u00A9 OpenStreetMap \u00B7 Terrain: Mapzen, AWS';
+  const PITCH = 60, BEARING = -20; // tilted, turned slightly so it reads as 3D
+  const EXAGGERATION = 1.8; // hills read better a little taller than life
   const LAND = '#F1F0ED';
   // Device px per map px on a 1080px-wide canvas, like a phone screenshot, so
   // street labels come out a readable size. Maps are always rendered at the
@@ -66,6 +73,23 @@ window.OV = window.OV || {};
     return style;
   }
 
+  // Terrain source, a satellite layer (hidden until a 3D render) and a hazy sky for
+  // tilted views. Terrain and satellite tiles only load while a 3D render is on.
+  function with3d(style) {
+    style.sources.terrain = { type: 'raster-dem', tiles: [TERRAIN], encoding: 'terrarium', tileSize: 256, maxzoom: 15 };
+    style.sources.satellite = { type: 'raster', tiles: [SATELLITE], tileSize: 256, maxzoom: 19 };
+    style.layers.splice(1, 0, { id: 'satellite', type: 'raster', source: 'satellite', layout: { visibility: 'none' } });
+    style.sky = {
+      'sky-color': '#BFD8EE',
+      'horizon-color': '#E4ECF2',
+      'fog-color': '#C9D5DF',
+      'sky-horizon-blend': 0.6,
+      'horizon-fog-blend': 0.6,
+      'fog-ground-blend': 0.9,
+    };
+    return style;
+  }
+
   // ---------- one hidden MapLibre map, reused for every render ----------
 
   let mapReady = null;
@@ -86,7 +110,7 @@ window.OV = window.OV || {};
     if (mapReady) return mapReady;
     mapReady = (async () => {
       if (!window.maplibregl) await loadScript(LIB, LIB_SRI);
-      const style = stravaStyle(await (await fetch(STYLE)).json());
+      const style = with3d(stravaStyle(await (await fetch(STYLE)).json()));
       const box = document.createElement('div');
       // Off screen but not display:none, so WebGL still renders.
       box.style.cssText = 'position:fixed;left:-20000px;top:0;width:400px;height:400px;pointer-events:none;';
@@ -142,29 +166,123 @@ window.OV = window.OV || {};
 
   // spec: frame size in 1080-reference px, route scale (px per projected unit) and
   // the frame center in projected coords (x = lon radians, y = -ln tan(pi/4 + lat/2)).
-  async function renderMap({ w, h, sc, cx, cy }) {
-    const { map, box } = await ensureMap();
+  function renderMap(spec) {
+    return spec.three ? render3d(spec) : renderFlat(spec);
+  }
+
+  // Sizes the hidden map to w x h device px (1080-reference) at about DENSITY;
+  // returns the exact device px per css px used.
+  function sizeMap(map, box, w, h) {
     const cssW = Math.max(1, Math.round(w / DENSITY));
     const ratio = w / cssW;
     box.style.width = `${cssW}px`;
     box.style.height = `${Math.max(1, Math.round(h / ratio))}px`;
     map.setPixelRatio(ratio);
     map.resize();
-    // MapLibre's world is 512 * 2^zoom css px around; ours is 2*pi*sc device px.
-    const zoom = Math.log2((2 * Math.PI * sc) / ratio / 512);
-    const lat = (2 * Math.atan(Math.exp(-cy)) - Math.PI / 2) * 180 / Math.PI;
-    map.jumpTo({ center: [cx * 180 / Math.PI, lat], zoom });
-    await new Promise((resolve) => {
+    return ratio;
+  }
+
+  function idle(map) {
+    return new Promise((resolve) => {
       const done = () => { clearTimeout(timer); resolve(); };
       const timer = setTimeout(() => { map.off('idle', done); resolve(); }, 20000);
       map.once('idle', done);
       map.triggerRepaint();
     });
+  }
+
+  function snapshot(map) {
     const src = map.getCanvas();
     const out = document.createElement('canvas');
     out.width = src.width;
     out.height = src.height;
     out.getContext('2d').drawImage(src, 0, 0);
+    return out;
+  }
+
+  // 3D satellite mode, like Strava's satellite view: terrain on, imagery instead of
+  // the drawn map (roads, land, water hidden), labels in white with a dark halo.
+  // The flat style is restored for flat renders.
+  let satOn = false;
+  let flatLayers = null; // [id, type, paint values to restore] for layers shown on the flat map
+  function set3d(map, on) {
+    map.setTerrain(on ? { source: 'terrain', exaggeration: EXAGGERATION } : null);
+    if (on === satOn) return;
+    satOn = on;
+    if (!flatLayers) {
+      flatLayers = map.getStyle().layers
+        .filter((l) => l.id !== 'satellite' && l.type !== 'background' && (l.layout || {}).visibility !== 'none')
+        .map((l) => [l.id, l.type, l.type === 'symbol'
+          ? { 'text-color': map.getPaintProperty(l.id, 'text-color'), 'text-halo-color': map.getPaintProperty(l.id, 'text-halo-color') }
+          : null]);
+    }
+    map.setLayoutProperty('satellite', 'visibility', on ? 'visible' : 'none');
+    for (const [id, type, paint] of flatLayers) {
+      if (type !== 'symbol') {
+        map.setLayoutProperty(id, 'visibility', on ? 'none' : 'visible');
+        continue;
+      }
+      map.setPaintProperty(id, 'text-color', on ? '#FFFFFF' : paint['text-color']);
+      map.setPaintProperty(id, 'text-halo-color', on ? 'rgba(0,0,0,0.7)' : paint['text-halo-color']);
+    }
+  }
+
+  async function renderFlat({ w, h, sc, cx, cy }) {
+    const { map, box } = await ensureMap();
+    const ratio = sizeMap(map, box, w, h);
+    set3d(map, false);
+    // MapLibre's world is 512 * 2^zoom css px around; ours is 2*pi*sc device px.
+    const zoom = Math.log2((2 * Math.PI * sc) / ratio / 512);
+    const lat = (2 * Math.atan(Math.exp(-cy)) - Math.PI / 2) * 180 / Math.PI;
+    map.jumpTo({ center: [cx * 180 / Math.PI, lat], zoom, pitch: 0, bearing: 0 });
+    await idle(map);
+    return snapshot(map);
+  }
+
+  // Tilted map with terrain. A tilted camera has no closed-form fit, so it is nudged
+  // until the projected route fills `inner` (frame px): measure where the route lands,
+  // rescale and recenter, repeat; again once the terrain has loaded, since elevation
+  // moves the route on screen. Returns the image with the route projected onto it
+  // (device px, terrain included) as `routePts`, for the overlay to draw.
+  async function render3d({ w, h, inner, route }) {
+    const { map, box } = await ensureMap();
+    const ratio = sizeMap(map, box, w, h);
+    set3d(map, true);
+    const step = Math.max(1, Math.floor(route.length / 600));
+    const ll = route.filter((_, i) => i % step === 0).map((p) => [p.lon, p.lat]);
+    const ib = { x: inner.x / ratio, y: inner.y / ratio, w: inner.w / ratio, h: inner.h / ratio };
+    const lons = ll.map((p) => p[0]), lats = ll.map((p) => p[1]);
+    const cam = map.cameraForBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]]) || {};
+    map.jumpTo({ center: cam.center || ll[0], zoom: cam.zoom || 12, pitch: PITCH, bearing: BEARING });
+
+    const fit = () => {
+      const { clientWidth: cw, clientHeight: ch } = map.getContainer();
+      for (let i = 0; i < 6; i++) {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const p of ll) {
+          const q = map.project(p);
+          if (q.x < x0) x0 = q.x;
+          if (q.x > x1) x1 = q.x;
+          if (q.y < y0) y0 = q.y;
+          if (q.y > y1) y1 = q.y;
+        }
+        const k = Math.min(ib.w / Math.max(1, x1 - x0), ib.h / Math.max(1, y1 - y0));
+        const dx = (x0 + x1) / 2 - (ib.x + ib.w / 2), dy = (y0 + y1) / 2 - (ib.y + ib.h / 2);
+        const center = map.unproject([cw / 2 + dx, ch / 2 + dy]);
+        map.jumpTo({ center, zoom: Math.min(18, map.getZoom() + Math.log2(k)) });
+      }
+    };
+    fit();
+    await idle(map);
+    fit();
+    await idle(map);
+
+    const out = snapshot(map);
+    const all = route.length > 2000 ? route.filter((_, i) => i % Math.ceil(route.length / 2000) === 0) : route;
+    out.routePts = all.concat([route[route.length - 1]]).map((p) => {
+      const q = map.project([p.lon, p.lat]);
+      return { x: q.x * ratio, y: q.y * ratio };
+    });
     return out;
   }
 
@@ -180,6 +298,7 @@ window.OV = window.OV || {};
   // Fills `frame` with the street map, fits the route into `o.inner` (default: the
   // frame inset by 12%) and draws it on top, Strava style. `o.radius` rounds the
   // frame's corners; `o.corners` picks which ones ('all' | 'top' | 'bottom').
+  // `o.three` draws a tilted 3D satellite map with terrain instead of the flat one.
   function drawMap(ctx, route, frame, o = {}) {
     const s = ctx.canvas.width / 1080;
     const inset = Math.min(frame.w, frame.h) * 0.12;
@@ -192,7 +311,33 @@ window.OV = window.OV || {};
     ctx.fillStyle = LAND;
     ctx.fillRect(frame.x, frame.y, frame.w, frame.h);
 
-    if (hasRoute) {
+    if (hasRoute && o.three) {
+      // Snap to 4 reference px so a thumbnail and the full-size paint share a render.
+      const q = (v) => Math.round(v / s / 4) * 4;
+      const spec = {
+        three: true,
+        route,
+        w: q(frame.w),
+        h: q(frame.h),
+        inner: { x: q(inner.x - frame.x), y: q(inner.y - frame.y), w: q(inner.w), h: q(inner.h) },
+      };
+      const { inner: ii } = spec;
+      const job = mapJob(['3d', routeId(route), spec.w, spec.h, ii.x, ii.y, ii.w, ii.h].join('|'), spec);
+      if (job.ready) {
+        const img = job.canvas, fx = frame.w / img.width, fy = frame.h / img.height;
+        ctx.drawImage(img, frame.x, frame.y, frame.w, frame.h);
+        const pts = img.routePts.map((p) => ({ x: frame.x + p.x * fx, y: frame.y + p.y * fy }));
+        const lw = (o.width || 9) * s;
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = OV.ORANGE;
+        ctx.lineWidth = lw;
+        ctx.stroke();
+        markers(ctx, pts[0], pts[pts.length - 1], lw);
+      }
+    } else if (hasRoute) {
       const view = OV.routeView(route, inner);
       // A thumbnail and the full-size paint of the same template differ only by
       // rounding, so snap the render to a coarse grid (scale to 4 digits, center to
@@ -221,8 +366,8 @@ window.OV = window.OV || {};
 
     ctx.font = `400 ${Math.max(8, 14 * s)}px "Inter", "Helvetica Neue", Arial, sans-serif`;
     ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(60,60,70,0.7)';
-    ctx.fillText(ATTRIBUTION, frame.x + frame.w - 14 * s - (o.radius || 0) * 0.3, frame.y + frame.h - 12 * s);
+    ctx.fillStyle = o.three ? 'rgba(255,255,255,0.8)' : 'rgba(60,60,70,0.7)';
+    ctx.fillText(o.three ? ATTRIBUTION_3D : ATTRIBUTION, frame.x + frame.w - 14 * s - (o.radius || 0) * 0.3, frame.y + frame.h - 12 * s);
     ctx.restore();
   }
 

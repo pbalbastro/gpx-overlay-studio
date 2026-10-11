@@ -411,6 +411,54 @@ window.OV = window.OV || {};
         OV.wordmark(ctx, d, cx, H - 90 * s, 34 * s);
       },
     },
+    {
+      id: 'course-data',
+      name: 'Course Data',
+      desc: 'A spec-sheet table of four stats over a lime elevation profile with start and high-point markers.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, F = OV.DIN, LIME = '205,234,45';
+        const short = H / W < 1.5;
+        const up = (v) => String(v).toUpperCase();
+        // Runs: distance, pace, time, climbing. Rides: distance, climbing, time, speed.
+        const elev = d.elev.num === '—' ? d.elev.value : `${Number(d.elev.num).toLocaleString('en-US')} ${d.elev.unit}`;
+        const rows = d.useSpeed
+          ? [['Total distance', d.dist.value], ['Elevation gain', elev], ['Moving time', d.time.clock], ['Avg speed', d.pace.value]]
+          : [['Total distance', d.dist.value], ['Avg pace', d.pace.value], ['Moving time', d.time.clock], ['Elevation gain', elev]];
+
+        // Header and table, rules above each row.
+        const x0 = W * 0.1, x1 = W * 0.9;
+        const fs = 33 * s, sp = 2.5 * s, rowH = (short ? 66 : 82) * s;
+        const cell = (str, x, y, align, color, alpha) => OV.text(ctx, up(str), align === 'right' ? x + sp : x, y, {
+          size: fs, weight: 500, family: F, align, spacing: sp, color, alpha, maxWidth: (x1 - x0) * 0.6,
+        });
+        let y = H * (short ? 0.06 : 0.05) + fs;
+        cell(d.useSpeed ? 'Ride' : 'Run', x0, y, 'left');
+        cell(d.name, x1, y, 'right', `rgb(${LIME})`);
+        y += fs * 1.25;
+        cell('Data', x0, y, 'left');
+        if (d.date) cell(d.date, x1, y, 'right', null, 0.6);
+        y += rowH * 0.45;
+        for (const [label, value] of rows) {
+          hairline(ctx, x0, y, x1 - x0, s);
+          y += rowH * 0.5 + fs * 0.36;
+          cell(label, x0, y, 'left');
+          cell(value, x1, y, 'right');
+          y += rowH * 0.5 - fs * 0.36;
+        }
+
+        // Elevation profile along the bottom, with the start and the high point marked.
+        const ph = H * (short ? 0.26 : 0.22);
+        const prof = OV.drawProfile(ctx, d.profile, { x: 0, y: H - ph, w: W, h: ph }, { width: 4 * s, rgb: LIME, minRange: 30 });
+        if (!prof) return;
+        const toUnit = (m) => `${Math.round(d.elev.unit === 'ft' ? m * 3.28084 : m).toLocaleString('en-US')} ${d.elev.unit}`;
+        const top = prof.samples.indexOf(Math.max(...prof.samples));
+        const peak = prof.pts[top];
+        profileMarker(ctx, peak, 'High point', toUnit(prof.samples[top]), s, LIME, W);
+        if (peak.x - prof.pts[0].x > W * 0.3) {
+          profileMarker(ctx, prof.pts[0], isLoop(d.route) ? 'Start / Finish' : 'Start', toUnit(prof.samples[0]), s, LIME, W);
+        }
+      },
+    },
 
     // ---------- TTRC running club ----------
     {
@@ -1012,6 +1060,36 @@ window.OV = window.OV || {};
     OV.stack(ctx, items, x, y, o);
   }
 
+  // A ▼ marker just above point `p` on an elevation profile, with a title and the
+  // elevation beside it (to the left near the right edge).
+  function profileMarker(ctx, p, title, sub, s, rgb, W) {
+    const ty = p.y - 30 * s, tw = 11 * s;
+    const px = Math.min(W - 40 * s, Math.max(40 * s, p.x)); // keep it on the canvas
+    ctx.save();
+    ctx.fillStyle = `rgb(${rgb})`;
+    ctx.beginPath();
+    ctx.moveTo(px - tw, ty - 18 * s);
+    ctx.lineTo(px + tw, ty - 18 * s);
+    ctx.lineTo(px, ty);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    const left = px > W * 0.7;
+    const x = left ? px - 24 * s : px + 24 * s;
+    const align = left ? 'right' : 'left';
+    OV.text(ctx, title.toUpperCase(), x, ty - 2 * s, { size: 26 * s, weight: 600, family: OV.DIN, align, spacing: 2 * s });
+    OV.text(ctx, sub.toUpperCase(), x, ty + 28 * s, { size: 22 * s, weight: 500, family: OV.DIN, align, spacing: 1.5 * s, alpha: 0.75 });
+  }
+
+  // True when the route ends within ~250 m of where it started.
+  function isLoop(route) {
+    if (!route || route.length < 2) return false;
+    const a = route[0], b = route[route.length - 1];
+    const dy = (b.lat - a.lat) * 111320;
+    const dx = (b.lon - a.lon) * 111320 * Math.cos((a.lat * Math.PI) / 180);
+    return Math.hypot(dx, dy) < 250;
+  }
+
   // The route drawn `n` times, each copy `step` lower and fainter, top copy in front,
   // like an extruded ribbon. A thin ring is erased around each copy before it is
   // drawn, so the grooves between layers are transparent and show the photo.
@@ -1165,9 +1243,10 @@ window.OV = window.OV || {};
     { id: 'clubs', name: 'CLUBS' },
     { id: 'white', name: 'WHITE' },
     { id: 'map', name: 'MAP' },
+    { id: 'other', name: 'OTHER' },
   ];
   // Template id prefix -> tab. The club layouts (TTRC, KL Bisiklista, APIMYCC) share CLUBS.
-  const PREFIX_GROUP = { ttrc: 'clubs', kl: 'clubs', apimycc: 'clubs', white: 'white', map: 'map' };
+  const PREFIX_GROUP = { ttrc: 'clubs', kl: 'clubs', apimycc: 'clubs', white: 'white', map: 'map', course: 'other' };
   for (const t of templates) {
     const prefix = (t.id.match(/^([a-z]+)-/) || [])[1]; // "ttrc-side" -> ttrc; "map" has none
     t.group = PREFIX_GROUP[prefix] || 'strava';

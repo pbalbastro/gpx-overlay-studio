@@ -11,6 +11,8 @@ window.OV = window.OV || {};
   const INTER = '"Inter", "Helvetica Neue", Arial, sans-serif';
   // Rounded handwriting (Sketch); Apple's Chalkboard is the look it stands in for.
   const HAND = '"Gaegu", "Chalkboard SE", "Comic Sans MS", cursive';
+  // DIN-style grotesque for spec-sheet layouts (Course Data).
+  const DIN = '"Barlow", "DIN Alternate", "Helvetica Neue", Arial, sans-serif';
 
   function font(ctx, size, weight, family = FONT) {
     ctx.font = `${weight} ${Math.max(1, size).toFixed(1)}px ${family}`;
@@ -452,8 +454,11 @@ window.OV = window.OV || {};
 
   // ---------- elevation profile ----------
 
+  // Elevation profile filling `box`, fading downward. `o.rgb` sets the colour as
+  // "r,g,b" (Strava orange by default). Returns the plotted points and their
+  // elevations (null without a profile), for placing markers.
   function drawProfile(ctx, profile, box, o = {}) {
-    if (!profile || profile.length < 2) return false;
+    if (!profile || profile.length < 2) return null;
     const maxD = profile[profile.length - 1].d || 1;
     const N = 180;
     const samples = [];
@@ -468,7 +473,9 @@ window.OV = window.OV || {};
     }
     let lo = Math.min(...samples);
     let hi = Math.max(...samples);
-    if (hi - lo < 10) { const mid = (hi + lo) / 2; lo = mid - 5; hi = mid + 5; }
+    // At least `o.minRange` metres tall, so small wobbles don't look like mountains.
+    const minRange = o.minRange || 10;
+    if (hi - lo < minRange) { const mid = (hi + lo) / 2; lo = mid - minRange / 2; hi = mid + minRange / 2; }
     const pts = samples.map((e, i) => ({
       x: box.x + (box.w * i) / N,
       y: box.y + box.h - ((e - lo) / (hi - lo)) * box.h * 0.85,
@@ -477,8 +484,9 @@ window.OV = window.OV || {};
     ctx.save();
     ctx.shadowColor = 'transparent';
     const g = ctx.createLinearGradient(0, box.y, 0, box.y + box.h);
-    g.addColorStop(0, 'rgba(252,76,2,0.55)');
-    g.addColorStop(1, 'rgba(252,76,2,0)');
+    const rgb = o.rgb || '252,76,2';
+    g.addColorStop(0, `rgba(${rgb},0.55)`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
     trace(ctx, pts);
     ctx.lineTo(box.x + box.w, box.y + box.h);
     ctx.lineTo(box.x, box.y + box.h);
@@ -491,11 +499,11 @@ window.OV = window.OV || {};
     trace(ctx, pts);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.strokeStyle = ORANGE;
+    ctx.strokeStyle = o.rgb ? `rgb(${o.rgb})` : ORANGE;
     ctx.lineWidth = o.width || 5;
     ctx.stroke();
     ctx.restore();
-    return true;
+    return { pts, samples };
   }
 
   // ---------- misc ----------
@@ -519,7 +527,7 @@ window.OV = window.OV || {};
   }
 
   Object.assign(OV, {
-    WHITE, ORANGE, CONDENSED, INTER, HAND, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
+    WHITE, ORANGE, CONDENSED, INTER, HAND, DIN, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
     drawRoute, drawProfile, roundRect, drawCover, routeView, fitRoute,
   });
 })(window.OV);

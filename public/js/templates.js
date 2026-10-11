@@ -460,6 +460,52 @@ window.OV = window.OV || {};
       },
     },
 
+    {
+      id: 'glass-card',
+      name: 'Liquid Glass',
+      desc: 'iOS 26 inspired: frosted glass card with the distance, route and stat pills, plus a glass title capsule.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2, F = OV.INTER;
+        const short = H / W < 1.5;
+        const dim = 'rgba(255,255,255,0.72)';
+
+        // Title capsule at the top.
+        const title = d.date ? `${d.name}  \u00B7  ${d.date}` : d.name;
+        const ts = 30 * s;
+        const tw = Math.min(W - 120 * s, OV.measure(ctx, title, ts, 600, 0, F) + 72 * s), th = 84 * s;
+        const ty = (short ? 60 : 110) * s;
+        glass(ctx, cx - tw / 2, ty, tw, th, th / 2, s);
+        OV.text(ctx, title, cx, ty + th / 2 + ts * 0.36, { size: ts, weight: 600, family: F, maxWidth: tw - 60 * s });
+
+        // Main card: distance top-left, route top-right, three stat pills along the bottom.
+        const pad = 48 * s, x = 60 * s, cw = W - 120 * s;
+        const pillH = 150 * s, ch = pad + 30 * s + 24 * s + 128 * s * 0.74 + 56 * s + pillH + pad;
+        const y = H - ch - (short ? 150 : 250) * s;
+        glass(ctx, x, y, cw, ch, 64 * s, s);
+        let ly = y + pad + 30 * s * 0.8;
+        OV.text(ctx, d.dist.label, x + pad, ly, { size: 30 * s, weight: 400, family: F, align: 'left', color: dim });
+        ly += 24 * s + 128 * s * 0.74;
+        OV.text(ctx, d.dist.value, x + pad, ly, { size: 128 * s, weight: 600, family: F, align: 'left', maxWidth: cw * 0.55 });
+        const pillTop = ly + 56 * s;
+        const rx = x + cw * 0.6, rTop = y + pad, rH = pillTop - 36 * s - rTop;
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,255,255,0.6)';
+        ctx.shadowBlur = 14 * s;
+        OV.drawRoute(ctx, d.route, { x: rx, y: rTop, w: x + cw - pad - rx, h: rH }, { width: 7 * s * d.rw, color: '#FFFFFF' });
+        ctx.restore();
+
+        const gap = 18 * s, pw = (cw - 2 * pad - 2 * gap) / 3;
+        [d.pace, d.time, d.elev].forEach((it, i) => {
+          const px = x + pad + i * (pw + gap);
+          glass(ctx, px, pillTop, pw, pillH, 40 * s, s, 0.08);
+          OV.text(ctx, it.label, px + pw / 2, pillTop + 50 * s, { size: 24 * s, weight: 400, family: F, color: dim });
+          OV.text(ctx, it.value, px + pw / 2, pillTop + 108 * s, { size: 44 * s, weight: 600, family: F, maxWidth: pw - 24 * s });
+        });
+
+        OV.wordmark(ctx, d, cx, y + ch + (short ? 90 : 130) * s, 36 * s);
+      },
+    },
+
     // ---------- TTRC running club ----------
     {
       id: 'ttrc-classic',
@@ -1060,6 +1106,75 @@ window.OV = window.OV || {};
     OV.stack(ctx, items, x, y, o);
   }
 
+  // Liquid-glass panel (iOS 26 style): a rounded shape that blurs and brightens
+  // whatever is already on the canvas behind it (the preview photo, when there is
+  // one), a light frosted tint, a bright gradient rim, a soft top glare, and a drop
+  // shadow kept outside the shape so it doesn't darken the glass.
+  function glass(ctx, x, y, w, h, r, s, tint = 0.12) {
+    r = Math.min(r, w / 2, h / 2);
+    // Adds the rounded rectangle to the current path (no beginPath, unlike OV.roundRect).
+    const outline = () => {
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    };
+    // Shadow, outside the shape only (clip to the canvas minus the shape).
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    outline();
+    ctx.clip('evenodd');
+    ctx.shadowColor = 'rgba(0,0,0,0.28)';
+    ctx.shadowBlur = 40 * s;
+    ctx.shadowOffsetY = 14 * s;
+    ctx.beginPath();
+    outline();
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.beginPath();
+    outline();
+    ctx.clip();
+    // Frost: re-draw what's behind, blurred and a little brighter. Browsers without
+    // canvas filters just skip the blur.
+    ctx.filter = `blur(${Math.round(22 * s)}px) saturate(1.5) brightness(1.1)`;
+    ctx.drawImage(ctx.canvas, 0, 0);
+    ctx.filter = 'none';
+    // Tint, lighter at the top.
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, `rgba(255,255,255,${tint + 0.1})`);
+    g.addColorStop(1, `rgba(255,255,255,${tint})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    // Glare across the top.
+    const glare = ctx.createRadialGradient(x + w * 0.3, y, 0, x + w * 0.3, y, Math.max(w, h) * 0.7);
+    glare.addColorStop(0, 'rgba(255,255,255,0.22)');
+    glare.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glare;
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+
+    // Rim: bright at the top-left and bottom-right edges, faint in between.
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    const rim = ctx.createLinearGradient(x, y, x + w, y + h);
+    rim.addColorStop(0, 'rgba(255,255,255,0.85)');
+    rim.addColorStop(0.35, 'rgba(255,255,255,0.15)');
+    rim.addColorStop(0.65, 'rgba(255,255,255,0.12)');
+    rim.addColorStop(1, 'rgba(255,255,255,0.55)');
+    OV.roundRect(ctx, x + s, y + s, w - 2 * s, h - 2 * s, r);
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = Math.max(1, 2.5 * s);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // A ▼ marker just above point `p` on an elevation profile, with a title and the
   // elevation beside it (to the left near the right edge).
   function profileMarker(ctx, p, title, sub, s, rgb, W) {
@@ -1246,7 +1361,7 @@ window.OV = window.OV || {};
     { id: 'other', name: 'OTHER' },
   ];
   // Template id prefix -> tab. The club layouts (TTRC, KL Bisiklista, APIMYCC) share CLUBS.
-  const PREFIX_GROUP = { ttrc: 'clubs', kl: 'clubs', apimycc: 'clubs', white: 'white', map: 'map', course: 'other' };
+  const PREFIX_GROUP = { ttrc: 'clubs', kl: 'clubs', apimycc: 'clubs', white: 'white', map: 'map', course: 'other', glass: 'other' };
   for (const t of templates) {
     const prefix = (t.id.match(/^([a-z]+)-/) || [])[1]; // "ttrc-side" -> ttrc; "map" has none
     t.group = PREFIX_GROUP[prefix] || 'strava';

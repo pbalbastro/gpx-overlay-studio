@@ -406,7 +406,10 @@
     window.addEventListener('dragover', (e) => e.preventDefault());
     window.addEventListener('drop', (e) => e.preventDefault());
 
-    $('demo').addEventListener('click', () => loadGPXText(OV.demoGPX(), true));
+    $('demo').addEventListener('click', () => {
+      loadGPXText(OV.demoGPX(), true);
+      showStage();
+    });
     $('bgInput').addEventListener('change', (e) => handleBg(e.target.files[0]));
     $('clearBg').addEventListener('click', () => {
       state.bg = null;
@@ -450,9 +453,26 @@
     await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 3000))]).catch(() => {});
   }
 
-  // On phones the editor is below the settings panel; bring it into view.
+  // Phones: settings are a bottom sheet over the editor (style.css). The gear button
+  // opens it; Done, the backdrop or Escape close it.
+  function setSheet(open) {
+    document.body.classList.toggle('sheet-open', open);
+    $('settingsBtn').setAttribute('aria-expanded', String(open));
+  }
+
+  function wireSheet() {
+    $('settingsBtn').addEventListener('click', () => setSheet(!document.body.classList.contains('sheet-open')));
+    $('sheetDone').addEventListener('click', () => setSheet(false));
+    $('sheetBackdrop').addEventListener('click', () => setSheet(false));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSheet(false); });
+    $('uploadBtn').addEventListener('click', () => $('gpxInput').click());
+    // On phones the error shows as a notice over the editor; tap it to dismiss.
+    $('error').addEventListener('click', () => { $('error').textContent = ''; });
+  }
+
+  // After an activity loads, show the editor: close the settings sheet on phones.
   function showStage() {
-    if (isPhoneLayout()) document.querySelector('.stage').scrollIntoView({ behavior: 'smooth' });
+    setSheet(false);
   }
 
   async function init() {
@@ -461,6 +481,7 @@
     buildTabs();
     wire();
     wireCarousel();
+    wireSheet();
     await Promise.all([loadFonts(), OV.loadLogos()]);
     loadGPXText(OV.demoGPX(), true);
     select(state.selected);

@@ -209,7 +209,7 @@ async function withStrava(request, env, session, fn) {
 // All calls to Strava identify the app; some API edges reject clients with no User-Agent.
 function stravaFetch(url, init = {}) {
   const headers = new Headers(init.headers);
-  headers.set('User-Agent', 'GPX-Overlay-Studio/1.0 (+https://twilight-wind-1210.patrick-d-balbastro.workers.dev)');
+  headers.set('User-Agent', 'GPX-Overlay-Studio/1.0 (+https://gpx-overlay.patrickbalbastro.workers.dev)');
   headers.set('Accept', 'application/json');
   return fetch(url, { ...init, headers });
 }

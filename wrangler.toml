@@ -1,4 +1,4 @@
-name = "twilight-wind-1210"
+name = "gpx-overlay"
 main = "src/worker.js"
 compatibility_date = "2025-09-01"
 

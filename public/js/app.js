@@ -114,6 +114,15 @@
 
   const isPhoneLayout = () => window.matchMedia('(max-width: 760px)').matches;
 
+  // "How to use" is a card above the tabs on desktop and a bottom sheet on phones. The
+  // stage is its own stacking context (for the carousel cards), so on phones the sheet
+  // moves to <body> to sit above the backdrop like the settings sheet.
+  function placeHowto() {
+    const howto = $('howto');
+    if (isPhoneLayout()) document.body.appendChild(howto);
+    else $('tabs').before(howto);
+  }
+
   // ---------- phone carousel ----------
 
   // Scrolls a horizontal strip (carousel or tabs) so `el` sits in its middle. Only the
@@ -171,8 +180,9 @@
         if (best && best !== state.selected) select(best);
       }, 120);
     }, { passive: true });
-
     window.matchMedia('(max-width: 760px)').addEventListener('change', () => {
+      setHowto(false);
+      placeHowto();
       renderAll();
       centerSelected(false);
       shapeCarousel();
@@ -483,48 +493,34 @@
     await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 3000))]).catch(() => {});
   }
 
-  // Phones: compact settings above the editor (style.css). Size and units are one-tap
-  // toggles that drive the (hidden) selects; the rest folds under "More options".
-  function setMore(open) {
-    $('moreBody').classList.toggle('open', open);
-    $('moreToggle').setAttribute('aria-expanded', String(open));
+  // Phones: settings are a bottom sheet over the editor (style.css). The gear button
+  // opens it; Done, the backdrop or Escape close it.
+  function setSheet(open) {
+    document.body.classList.toggle('sheet-open', open);
+    $('settingsBtn').setAttribute('aria-expanded', String(open));
   }
 
-  // The editor takes the rest of the screen under the header and the compact settings
-  // (with "More options" closed), so the page fits one screen without scrolling.
-  function fitStage() {
-    const stage = document.querySelector('.stage');
-    const more = $('moreBody').classList.contains('open') ? $('moreBody').offsetHeight + 12 : 0;
-    const above = isPhoneLayout() ? stage.getBoundingClientRect().top + window.scrollY - more : 0;
-    document.documentElement.style.setProperty('--above', `${Math.round(above)}px`);
+  function setHowto(open) {
+    document.body.classList.toggle('howto-open', open);
+    $('howtoBtn').setAttribute('aria-expanded', String(open));
   }
 
-  function wireCompact() {
-    document.querySelectorAll('.seg').forEach((seg) => {
-      const select = $(seg.dataset.for);
-      const sync = () => seg.querySelectorAll('button').forEach((b) => {
-        b.classList.toggle('on', b.dataset.value === select.value);
-        b.setAttribute('aria-pressed', String(b.dataset.value === select.value));
-      });
-      seg.addEventListener('click', (e) => {
-        const b = e.target.closest('button');
-        if (!b || select.value === b.dataset.value) return;
-        select.value = b.dataset.value;
-        select.dispatchEvent(new Event('change')); // re-renders, like picking from the select
-      });
-      select.addEventListener('change', sync);
-      sync();
-    });
-    $('moreToggle').addEventListener('click', () => setMore(!$('moreBody').classList.contains('open')));
-    window.addEventListener('resize', fitStage);
-    fitStage();
+  function wireSheet() {
+    placeHowto();
+    $('settingsBtn').addEventListener('click', () => setSheet(!document.body.classList.contains('sheet-open')));
+    $('sheetDone').addEventListener('click', () => setSheet(false));
+    $('howtoBtn').addEventListener('click', () => setHowto(!document.body.classList.contains('howto-open')));
+    $('howtoDone').addEventListener('click', () => setHowto(false));
+    $('sheetBackdrop').addEventListener('click', () => { setSheet(false); setHowto(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setSheet(false); setHowto(false); } });
+    $('uploadBtn').addEventListener('click', () => $('gpxInput').click());
+    // On phones the error shows as a notice over the editor; tap it to dismiss.
+    $('error').addEventListener('click', () => { $('error').textContent = ''; });
   }
 
-  // After an activity loads on a phone, fold the extra settings and show the editor.
+  // After an activity loads, show the editor: close the settings sheet on phones.
   function showStage() {
-    if (!isPhoneLayout()) return;
-    setMore(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setSheet(false);
   }
 
   async function init() {
@@ -533,9 +529,8 @@
     buildTabs();
     wire();
     wireCarousel();
-    wireCompact();
+    wireSheet();
     await Promise.all([loadFonts(), OV.loadLogos()]);
-    fitStage(); // fonts can change the header height
     loadGPXText(OV.demoGPX(), true);
     select(state.selected);
     centerSelected(false);

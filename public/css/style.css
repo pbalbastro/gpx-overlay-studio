@@ -32,23 +32,8 @@ button, input, select { font: inherit; color: inherit; }
 .top p { margin: 0; color: var(--muted); }
 .brand { font-weight: 800; font-size: 18px; display: flex; align-items: center; gap: 10px; }
 .brand .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--orange); }
-/* Phone-only controls (compact settings); hidden on wider screens. */
-.phone-only, .seg, .more-toggle { display: none; }
-.upload-row { display: contents; }
-
-/* One-tap toggle group (phones), standing in for a select. */
-.seg { gap: 4px; padding: 3px; border-radius: 10px; background: #111113; border: 1px solid var(--line); }
-.seg button {
-  flex: 1;
-  border: 0;
-  border-radius: 8px;
-  padding: 7px 8px;
-  background: transparent;
-  color: var(--muted);
-  font-weight: 700;
-  cursor: pointer;
-}
-.seg button.on { background: var(--orange); color: #fff; }
+/* Phone-only controls (bottom-sheet settings); hidden on wider screens. */
+.top-actions, .sheet-head, .sheet-backdrop { display: none; }
 
 .layout {
   display: grid;
@@ -252,13 +237,50 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
 .actions button:disabled { opacity: 0.5; cursor: progress; }
 #copyPng { display: none; } /* phones only */
 
-.templates h3 {
-  margin: 0 0 12px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+.howto {
+  margin-bottom: 14px;
+  background: #111113;
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
+.howto-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+.howto-title svg { color: var(--orange); }
+.howto ol {
+  counter-reset: step;
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.howto li { counter-increment: step; position: relative; padding-left: 30px; }
+.howto li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  background: var(--orange-dim);
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 700;
+}
+.howto li b { color: var(--text); }
 .tabs {
   display: flex;
   gap: 8px;
@@ -322,39 +344,85 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
   .preview { max-width: 420px; }
 }
 @media (max-width: 760px) {
-  .layout { grid-template-columns: 1fr; gap: 10px; padding: 10px 16px 0; }
-  .top { padding: 12px 16px; flex-wrap: nowrap; align-items: center; }
+  .layout { grid-template-columns: 1fr; padding: 0 16px; }
+  .top {
+    height: 52px;
+    padding: 0 12px 0 16px;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+  }
   .top p { display: none; }
   .brand { font-size: 16px; }
-
-  /* Compact settings: upload row, size toggle, units toggle + "More options". */
-  .panel { position: static; max-height: none; padding: 12px; }
-  .wide-only { display: none; }
-  .phone-only { display: inline; }
-  .upload-row { display: flex; align-items: center; gap: 12px; }
-  .drop { flex: 1; flex-direction: row; justify-content: center; gap: 8px; padding: 9px 12px; border-width: 1.5px; }
-  .drop svg { width: 18px; height: 18px; }
-  .upload-row .link { padding: 6px 2px; white-space: nowrap; }
-  .controls h3, .controls .size-label, #units { display: none; } /* the toggles stand in */
-  .seg { display: flex; margin-top: 10px; }
-  .seg-row { display: flex; align-items: center; gap: 10px; }
-  .seg-row .seg { flex: 0 0 120px; }
-  .more-toggle {
+  .top-actions { display: flex; gap: 8px; }
+  .top-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    margin: 10px 0 0 auto;
-    border: 0;
-    background: none;
-    color: var(--muted);
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 99px;
+    border: 1px solid var(--line);
+    background: var(--panel);
     font-weight: 700;
     cursor: pointer;
   }
-  .more-toggle::after { content: '\25BE'; transition: transform 0.15s; }
-  .more-toggle[aria-expanded="true"]::after { transform: rotate(180deg); }
-  .more-body { display: none; margin-top: 12px; }
-  .more-body.open { display: block; }
-  .more-body .hint { display: none; }
+
+  /* Settings: the panel becomes a bottom sheet, opened with the gear button. It
+     slides with `bottom` rather than a transform, so the error notice inside it can
+     still be position: fixed to the screen. "How to use" is the same kind of sheet,
+     opened with the ⓘ button (app.js moves it out of the stage on phones). */
+  .panel,
+  .howto {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: -100dvh;
+    max-height: 85dvh;
+    overflow-y: auto;
+    border-radius: 18px 18px 0 0;
+    border-bottom: 0;
+    padding: 0 18px calc(18px + env(safe-area-inset-bottom));
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+    visibility: hidden;
+    transition: bottom 0.25s ease, visibility 0s linear 0.25s;
+  }
+  .sheet-open .panel,
+  .howto-open .howto { bottom: 0; visibility: visible; transition: bottom 0.25s ease; }
+  .howto { margin: 0; background: var(--panel); }
+  .howto-title { display: none; } /* the sheet head shows the title */
+  .howto ol { padding: 4px 0 0; font-size: 14px; gap: 12px; }
+  .sheet-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 -18px 10px;
+    padding: 16px 18px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet-head strong { font-size: 16px; }
+  .sheet-open .sheet-backdrop,
+  .howto-open .sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, 0.55); }
+  .drop { display: none; } /* upload is the GPX button in the top bar */
+  /* Errors show as a notice under the top bar, even while the sheet is closed. */
+  .error:not(:empty) {
+    visibility: visible;
+    position: fixed;
+    z-index: 50;
+    top: 60px;
+    left: 16px;
+    right: 16px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #ff7a59;
+    background: #2a1712;
+  }
   .info { display: none; } /* activity details card: the templates show the same stats */
   /* Grid items default to min-width: auto, which lets the long carousel row widen the
      whole page instead of scrolling inside itself. */
@@ -370,11 +438,11 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
     flex-direction: column;
     align-items: stretch; /* desktop's align-items: start would size rows to their content */
     justify-content: center; /* keep title, tabs, carousel and buttons together */
-    isolation: isolate; /* card z-indexes (app.js) stay inside the editor */
+    isolation: isolate; /* card z-indexes (app.js) stay below the settings sheet */
     gap: 10px;
-    /* the rest of the screen under the header and compact settings (--above, app.js) */
-    height: calc(100vh - var(--above, 0px));
-    height: calc(100dvh - var(--above, 0px));
+    /* one screen under the 52px top bar */
+    height: calc(100vh - 52px);
+    height: calc(100dvh - 52px);
     padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
   .preview { display: none; }
@@ -384,7 +452,6 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
   .actions button { padding: 12px; }
   #copyPng:not([hidden]) { display: block; }
   .templates { display: flex; flex-direction: column; }
-  .templates h3 { margin: 4px 0 10px; }
   .tabs,
   .grid { scrollbar-width: none; }
   .tabs::-webkit-scrollbar,
@@ -395,7 +462,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
     /* Card width: 70% of the screen, or less if a card that wide would be too tall.
        --ar is the canvas width / height, set by app.js. Neighbours overlap by
        --tuck so their shrunken versions sit close beside the middle card. */
-    --card-w: min(70vw, calc((100dvh - var(--above, 0px) - 272px) * var(--ar, 0.5625)));
+    --card-w: min(70vw, calc((100dvh - 260px) * var(--ar, 0.5625)));
     --tuck: calc(var(--card-w) * 0.1);
     position: relative; /* card offsets are measured against the carousel */
     display: flex;

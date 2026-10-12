@@ -351,10 +351,14 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
     flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
   }
   .top p { display: none; }
-  .brand { font-size: 16px; }
-  .top-actions { display: flex; gap: 8px; }
+  /* One line: on narrow phones (iPhone 13, 390px) the name would otherwise wrap and
+     spill out of the 52px bar. */
+  .brand { font-size: 15px; gap: 8px; white-space: nowrap; min-width: 0; }
+  .top-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  @media (max-width: 380px) { .brand-tail { display: none; } } /* iPhone mini / SE */
   .top-btn {
     display: inline-flex;
     align-items: center;
@@ -367,6 +371,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
     font-weight: 700;
     cursor: pointer;
   }
+  #howtoBtn, #settingsBtn { width: 36px; padding: 0; justify-content: center; } /* icon-only: square */
 
   /* Settings: the panel becomes a bottom sheet, opened with the gear button. It
      slides with `bottom` rather than a transform, so the error notice inside it can

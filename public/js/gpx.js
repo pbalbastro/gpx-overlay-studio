@@ -268,6 +268,7 @@ window.OV = window.OV || {};
       profile: st.profile,
       name: opts.title || meta.name || autoName(st.start, isRide, L),
       date,
+      location: opts.location || null, // place name, when the app has looked it up
       wordmark: 'STRAVA', // always drawn as the STRAVA logo
       rw: opts.routeWidth || 1,
     };

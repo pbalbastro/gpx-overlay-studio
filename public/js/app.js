@@ -22,6 +22,7 @@
       units: $('units').value,
       title: $('title').value.trim(),
       calories: state.calories, // only Strava activities carry calories
+      location: state.location, // looked up from the start point (lookupLocation)
       shadow: $('shadow').checked,
       routeWidth: parseFloat($('routeWidth').value),
       includeBg: $('includeBg').checked,
@@ -170,6 +171,7 @@
         if (best && best !== state.selected) select(best);
       }, 120);
     }, { passive: true });
+
     window.matchMedia('(max-width: 760px)').addEventListener('change', () => {
       renderAll();
       centerSelected(false);
@@ -255,7 +257,35 @@
     $('title').value = '';
     $('title').placeholder = meta.name || 'Auto (e.g. Morning Run)';
     state.calories = extras.calories || null;
+    state.location = null;
     renderAll();
+    lookupLocation(stats.points);
+  }
+
+  // City-level place name for the activity's start ("Kuala Lumpur, Malaysia"), from
+  // OpenStreetMap's Nominatim. GPX files only hold coordinates. City level on purpose:
+  // the start is often someone's home. One request per activity, cached; repaints when
+  // it arrives, and templates simply leave the location out until then or if it fails.
+  const placeCache = new Map();
+  async function lookupLocation(points) {
+    const p = points && points.find((q) => q.lat != null);
+    if (!p) return;
+    const key = `${p.lat.toFixed(2)},${p.lon.toFixed(2)}`; // ~1 km grid, also limits precision sent
+    try {
+      let place = placeCache.get(key);
+      if (place === undefined) {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=en&lat=${key.split(',')[0]}&lon=${key.split(',')[1]}`;
+        const res = await fetch(url);
+        const a = res.ok ? (await res.json()).address || {} : {};
+        const town = a.city || a.town || a.village || a.municipality || a.county || a.state;
+        place = [town, a.country].filter(Boolean).join(', ') || null;
+        placeCache.set(key, place);
+      }
+      if (state.stats && state.stats.points === points && place) {
+        state.location = place;
+        scheduleRender();
+      }
+    } catch (e) { /* offline: no location */ }
   }
 
   function handleFile(file) {
@@ -453,26 +483,48 @@
     await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 3000))]).catch(() => {});
   }
 
-  // Phones: settings are a bottom sheet over the editor (style.css). The gear button
-  // opens it; Done, the backdrop or Escape close it.
-  function setSheet(open) {
-    document.body.classList.toggle('sheet-open', open);
-    $('settingsBtn').setAttribute('aria-expanded', String(open));
+  // Phones: compact settings above the editor (style.css). Size and units are one-tap
+  // toggles that drive the (hidden) selects; the rest folds under "More options".
+  function setMore(open) {
+    $('moreBody').classList.toggle('open', open);
+    $('moreToggle').setAttribute('aria-expanded', String(open));
   }
 
-  function wireSheet() {
-    $('settingsBtn').addEventListener('click', () => setSheet(!document.body.classList.contains('sheet-open')));
-    $('sheetDone').addEventListener('click', () => setSheet(false));
-    $('sheetBackdrop').addEventListener('click', () => setSheet(false));
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSheet(false); });
-    $('uploadBtn').addEventListener('click', () => $('gpxInput').click());
-    // On phones the error shows as a notice over the editor; tap it to dismiss.
-    $('error').addEventListener('click', () => { $('error').textContent = ''; });
+  // The editor takes the rest of the screen under the header and the compact settings
+  // (with "More options" closed), so the page fits one screen without scrolling.
+  function fitStage() {
+    const stage = document.querySelector('.stage');
+    const more = $('moreBody').classList.contains('open') ? $('moreBody').offsetHeight + 12 : 0;
+    const above = isPhoneLayout() ? stage.getBoundingClientRect().top + window.scrollY - more : 0;
+    document.documentElement.style.setProperty('--above', `${Math.round(above)}px`);
   }
 
-  // After an activity loads, show the editor: close the settings sheet on phones.
+  function wireCompact() {
+    document.querySelectorAll('.seg').forEach((seg) => {
+      const select = $(seg.dataset.for);
+      const sync = () => seg.querySelectorAll('button').forEach((b) => {
+        b.classList.toggle('on', b.dataset.value === select.value);
+        b.setAttribute('aria-pressed', String(b.dataset.value === select.value));
+      });
+      seg.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b || select.value === b.dataset.value) return;
+        select.value = b.dataset.value;
+        select.dispatchEvent(new Event('change')); // re-renders, like picking from the select
+      });
+      select.addEventListener('change', sync);
+      sync();
+    });
+    $('moreToggle').addEventListener('click', () => setMore(!$('moreBody').classList.contains('open')));
+    window.addEventListener('resize', fitStage);
+    fitStage();
+  }
+
+  // After an activity loads on a phone, fold the extra settings and show the editor.
   function showStage() {
-    setSheet(false);
+    if (!isPhoneLayout()) return;
+    setMore(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function init() {
@@ -481,8 +533,9 @@
     buildTabs();
     wire();
     wireCarousel();
-    wireSheet();
+    wireCompact();
     await Promise.all([loadFonts(), OV.loadLogos()]);
+    fitStage(); // fonts can change the header height
     loadGPXText(OV.demoGPX(), true);
     select(state.selected);
     centerSelected(false);

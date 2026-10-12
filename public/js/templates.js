@@ -161,6 +161,46 @@ window.OV = window.OV || {};
       },
     },
     {
+      id: 'contents',
+      name: 'Contents',
+      desc: 'Table-of-contents list of every stat in the file, with dot leaders beside an orange accent bar.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5;
+        const rows = allStats(d);
+        const x = 110 * s, x1 = W - 80 * s;
+        const head = 150 * s;
+        const rowH = Math.min((short ? 64 : 84) * s, (H * (short ? 0.72 : 0.7) - head) / rows.length);
+        const fs = Math.min(34 * s, rowH * 0.48);
+        const blockH = head + rows.length * rowH;
+        const top = (H - blockH) / 2 - (short ? 20 : 40) * s;
+
+        ctx.save();
+        ctx.fillStyle = ORANGE;
+        OV.roundRect(ctx, x - 44 * s, top, 8 * s, blockH, 4 * s);
+        ctx.fill();
+        ctx.restore();
+        OV.text(ctx, 'CONTENTS', x, top + 30 * s, { size: 26 * s, weight: 700, color: ORANGE, align: 'left', spacing: 5 * s });
+        OV.text(ctx, d.name, x, top + 96 * s, { size: 52 * s, weight: 800, align: 'left', maxWidth: x1 - x });
+
+        rows.forEach(([label, value], i) => {
+          const y = top + head + i * rowH + rowH * 0.62;
+          const lw = OV.text(ctx, label.toUpperCase(), x, y, { size: fs * 0.8, weight: 700, align: 'left', spacing: 3 * s, alpha: 0.85 });
+          const vw = OV.text(ctx, value, x1, y, { size: fs, weight: 800, align: 'right' });
+          // Dot leaders between label and value.
+          const dx0 = x + lw + 18 * s, dx1 = x1 - vw - 18 * s;
+          ctx.save();
+          ctx.fillStyle = 'rgba(255,255,255,0.45)';
+          for (let dx = dx0; dx < dx1; dx += 14 * s) {
+            ctx.beginPath();
+            ctx.arc(dx, y - 3 * s, 2.2 * s, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        });
+        OV.wordmark(ctx, d, x, Math.min(H - 40 * s, top + blockH + 90 * s), 36 * s, 'left');
+      },
+    },
+    {
       id: 'card',
       name: 'Activity Card',
       desc: 'Translucent card with title, date, route and stats.',
@@ -223,14 +263,15 @@ window.OV = window.OV || {};
         OV.wordmark(ctx, d, W - x0, y, 34 * s, 'right');
         y += 50 * s;
 
+        // Compact list: short rows and thin bars.
         const rows = groupSplits(d.splits, 12);
-        const areaH = H * 0.42;
+        const areaH = H * 0.3;
         if (rows.length) {
-          const rowH = Math.min(64 * s, areaH / rows.length);
-          const barH = rowH * 0.55, fs = Math.min(30 * s, rowH * 0.5);
+          const rowH = Math.min(40 * s, areaH / rows.length);
+          const barH = rowH * 0.42, fs = Math.min(24 * s, rowH * 0.6);
           const paces = rows.map((r) => r.paceSecs);
           const fast = Math.min(...paces), slow = Math.max(...paces);
-          const barX = x0 + 110 * s, barMax = W * 0.52;
+          const barX = x0 + 80 * s, barMax = W * 0.42;
           rows.forEach((r, i) => {
             const cy = y + rowH * (i + 0.5);
             const bw = barMax * (0.45 + 0.55 * ((slow - r.paceSecs) / (slow - fast || 1)));
@@ -240,7 +281,7 @@ window.OV = window.OV || {};
             OV.roundRect(ctx, barX, cy - barH / 2, bw, barH, barH / 2);
             ctx.fill();
             ctx.restore();
-            OV.text(ctx, OV.fmtPace(r.paceSecs), barX + bw + 24 * s, cy + fs * 0.36, { size: fs, weight: 700, align: 'left' });
+            OV.text(ctx, OV.fmtPace(r.paceSecs), barX + bw + 16 * s, cy + fs * 0.36, { size: fs, weight: 700, align: 'left' });
           });
           y += rowH * rows.length;
         } else {
@@ -251,7 +292,7 @@ window.OV = window.OV || {};
         const rowTop = H - 100 * s - (28 * 0.8 + 56 * 1.05) * s;
         OV.row(ctx, [d.dist, d.pace, d.time], 40 * s, W - 80 * s, rowTop, { labelSize: 28 * s, valueSize: 56 * s });
         const top = y + 60 * s, avail = rowTop - 80 * s - top;
-        const rh = Math.max(0, Math.min(H * 0.2, avail));
+        const rh = Math.max(0, Math.min(H * 0.3, avail));
         OV.drawRoute(ctx, d.route, { x: cx - W * 0.25, y: top + (avail - rh) / 2, w: W * 0.5, h: rh }, { width: 10 * s * d.rw });
       },
     },
@@ -457,52 +498,6 @@ window.OV = window.OV || {};
         if (peak.x - prof.pts[0].x > W * 0.3) {
           profileMarker(ctx, prof.pts[0], isLoop(d.route) ? 'Start / Finish' : 'Start', toUnit(prof.samples[0]), s, LIME, W);
         }
-      },
-    },
-
-    {
-      id: 'glass-card',
-      name: 'Liquid Glass',
-      desc: 'iOS 26 inspired: frosted glass card with the distance, route and stat pills, plus a glass title capsule.',
-      draw(ctx, W, H, d) {
-        const s = W / 1080, cx = W / 2, F = OV.INTER;
-        const short = H / W < 1.5;
-        const dim = 'rgba(255,255,255,0.72)';
-
-        // Title capsule at the top.
-        const title = d.date ? `${d.name}  \u00B7  ${d.date}` : d.name;
-        const ts = 30 * s;
-        const tw = Math.min(W - 120 * s, OV.measure(ctx, title, ts, 600, 0, F) + 72 * s), th = 84 * s;
-        const ty = (short ? 60 : 110) * s;
-        glass(ctx, cx - tw / 2, ty, tw, th, th / 2, s);
-        OV.text(ctx, title, cx, ty + th / 2 + ts * 0.36, { size: ts, weight: 600, family: F, maxWidth: tw - 60 * s });
-
-        // Main card: distance top-left, route top-right, three stat pills along the bottom.
-        const pad = 48 * s, x = 60 * s, cw = W - 120 * s;
-        const pillH = 150 * s, ch = pad + 30 * s + 24 * s + 128 * s * 0.74 + 56 * s + pillH + pad;
-        const y = H - ch - (short ? 150 : 250) * s;
-        glass(ctx, x, y, cw, ch, 64 * s, s);
-        let ly = y + pad + 30 * s * 0.8;
-        OV.text(ctx, d.dist.label, x + pad, ly, { size: 30 * s, weight: 400, family: F, align: 'left', color: dim });
-        ly += 24 * s + 128 * s * 0.74;
-        OV.text(ctx, d.dist.value, x + pad, ly, { size: 128 * s, weight: 600, family: F, align: 'left', maxWidth: cw * 0.55 });
-        const pillTop = ly + 56 * s;
-        const rx = x + cw * 0.6, rTop = y + pad, rH = pillTop - 36 * s - rTop;
-        ctx.save();
-        ctx.shadowColor = 'rgba(255,255,255,0.6)';
-        ctx.shadowBlur = 14 * s;
-        OV.drawRoute(ctx, d.route, { x: rx, y: rTop, w: x + cw - pad - rx, h: rH }, { width: 7 * s * d.rw, color: '#FFFFFF' });
-        ctx.restore();
-
-        const gap = 18 * s, pw = (cw - 2 * pad - 2 * gap) / 3;
-        [d.pace, d.time, d.elev].forEach((it, i) => {
-          const px = x + pad + i * (pw + gap);
-          glass(ctx, px, pillTop, pw, pillH, 40 * s, s, 0.08);
-          OV.text(ctx, it.label, px + pw / 2, pillTop + 50 * s, { size: 24 * s, weight: 400, family: F, color: dim });
-          OV.text(ctx, it.value, px + pw / 2, pillTop + 108 * s, { size: 44 * s, weight: 600, family: F, maxWidth: pw - 24 * s });
-        });
-
-        OV.wordmark(ctx, d, cx, y + ch + (short ? 90 : 130) * s, 36 * s);
       },
     },
 
@@ -898,7 +893,704 @@ window.OV = window.OV || {};
         });
       },
     },
+
+    // ---------- Apple Fitness inspired ----------
+    {
+      id: 'apple-rings',
+      name: 'Activity Rings',
+      desc: 'Apple Fitness inspired: three rings fill toward distance, time and climbing goals.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, F = OV.INTER;
+        const g = ringGoals(d);
+        const rings = [
+          { label: 'Distance', color: APPLE.red, ...g.dist },
+          { label: 'Time', color: APPLE.green, ...g.time },
+          { label: 'Climb', color: APPLE.cyan, ...g.elev },
+        ];
+        const R = W * (short ? 0.22 : 0.3);
+        const cx = short ? W * 0.3 : W / 2, cy = short ? H / 2 : H * 0.33;
+        drawRings(ctx, cx, cy, R, R * 0.2, rings);
+        const x = short ? W * 0.58 : W * 0.14;
+        let y = short ? H / 2 - 210 * s : cy + R + 140 * s;
+        for (const r of rings) {
+          OV.text(ctx, r.label, x, y, { size: 34 * s, weight: 600, family: F, color: r.color, align: 'left' });
+          OV.text(ctx, r.text, x, y + 70 * s, { size: 64 * s, weight: 600, family: F, color: r.color, align: 'left', maxWidth: W - x - 50 * s });
+          y += 165 * s;
+        }
+      },
+    },
+    {
+      id: 'apple-summary',
+      name: 'Workout Summary',
+      desc: 'Apple Fitness inspired: the workout summary, coloured metrics in a dark card.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, F = OV.INTER;
+        const cells = appleCells(d);
+        const x = 50 * s, w = W - 100 * s, pad = 50 * s;
+        const rowH = (short ? 150 : 190) * s, head = 170 * s;
+        const h = pad + head + 3 * rowH + pad * 0.5;
+        const y = short ? (H - h) / 2 - 30 * s : H - h - 160 * s;
+        darkCard(ctx, x, y, w, h, 48 * s, s);
+        noShadow(ctx, () => {
+          sportIcon(ctx, x + pad + 52 * s, y + pad + 52 * s, 52 * s, d.useSpeed, APPLE.green);
+          const tx = x + pad + 130 * s;
+          OV.text(ctx, d.useSpeed ? 'Outdoor Cycle' : 'Outdoor Run', tx, y + pad + 46 * s, {
+            size: 44 * s, weight: 600, family: F, align: 'left', maxWidth: w - pad * 2 - 130 * s,
+          });
+          if (d.date) OV.text(ctx, d.date, tx, y + pad + 92 * s, { size: 28 * s, weight: 400, family: F, align: 'left', color: APPLE.muted });
+          const colW = (w - 2 * pad) / 2;
+          cells.forEach((c, i) => {
+            const cx = x + pad + (i % 2) * colW, ry = y + pad + head + Math.floor(i / 2) * rowH;
+            if (i % 2 === 0) rule(ctx, x + pad, ry, w - 2 * pad, s, 0.14);
+            OV.text(ctx, c.label, cx, ry + 46 * s, { size: 28 * s, weight: 400, family: F, align: 'left' });
+            unitValue(ctx, c.num, c.unit, cx, ry + (short ? 116 : 136) * s, (short ? 60 : 74) * s, c.color, F, 'left', colW - 20 * s);
+          });
+        });
+      },
+    },
+    {
+      id: 'apple-pacemap',
+      name: 'Pace Map',
+      desc: 'Apple Fitness inspired: the route coloured by pace, from slowest (red) to fastest (green).',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, F = OV.INTER, cx = W / 2;
+        const box = { x: W * 0.08, y: H * (short ? 0.06 : 0.1), w: W * 0.84, h: H * (short ? 0.5 : 0.5) };
+        paceRoute(ctx, d.route, box, 14 * s * d.rw, s);
+        let y = box.y + box.h + (short ? 60 : 110) * s;
+        // Legend: slowest to fastest.
+        const lw = W * 0.5, lx = cx - lw / 2;
+        noShadow(ctx, () => {
+          const g = ctx.createLinearGradient(lx, 0, lx + lw, 0);
+          g.addColorStop(0, paceHue(0));
+          g.addColorStop(0.5, paceHue(0.5));
+          g.addColorStop(1, paceHue(1));
+          ctx.fillStyle = g;
+          OV.roundRect(ctx, lx, y, lw, 14 * s, 7 * s);
+          ctx.fill();
+        });
+        OV.text(ctx, 'Slowest', lx, y + 50 * s, { size: 24 * s, weight: 400, family: F, align: 'left', alpha: 0.8 });
+        OV.text(ctx, 'Fastest', lx + lw, y + 50 * s, { size: 24 * s, weight: 400, family: F, align: 'right', alpha: 0.8 });
+        y += (short ? 110 : 150) * s;
+        const cols = [
+          ['Distance', d.dist.num, d.dist.unit.toUpperCase()],
+          [d.useSpeed ? 'Avg. Speed' : 'Avg. Pace', d.pace.num, d.pace.unit.toUpperCase()],
+          ['Time', d.time.clock, ''],
+        ];
+        const colW = (W - 120 * s) / 3;
+        cols.forEach(([label, num, unit], i) => {
+          const x = 60 * s + colW * (i + 0.5);
+          OV.text(ctx, label, x, y, { size: 26 * s, weight: 400, family: F, alpha: 0.8 });
+          unitValue(ctx, num, unit, x, y + 72 * s, 56 * s, '#FFFFFF', F, 'center', colW - 16 * s);
+        });
+      },
+    },
+    {
+      id: 'apple-splits',
+      name: 'Split Times',
+      desc: 'Apple Fitness inspired: a splits table with time and pace per km (or mile), fastest in green.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, F = OV.INTER;
+        const x = 50 * s, w = W - 100 * s, pad = 50 * s;
+        const rowH = (short ? 58 : 76) * s, head = 190 * s;
+        // As many rows as fit (merging splits beyond that), card sized to the rows.
+        const room = H - (short ? 60 : H * 0.1 / s) * s - (short ? 130 : 260) * s;
+        const rows = splitRows(d.splits, Math.max(1, Math.floor((room - head - pad) / rowH)));
+        const h = head + rows.length * rowH + pad;
+        const top = short ? (H - h) / 2 - 30 * s : H - h - 260 * s;
+        darkCard(ctx, x, top, w, h, 48 * s, s);
+        const fastest = Math.min(...rows.map((r) => r.paceSecs));
+        noShadow(ctx, () => {
+          OV.text(ctx, d.splitsLabel, x + pad, top + pad + 40 * s, { size: 48 * s, weight: 600, family: F, align: 'left' });
+          OV.text(ctx, `${d.dist.value} · ${d.pace.value}`, x + pad, top + pad + 88 * s, { size: 28 * s, weight: 400, family: F, align: 'left', color: APPLE.muted });
+          const cols = [x + pad, x + w * 0.42, x + w - pad];
+          const hy = top + head - 20 * s;
+          [['#', 'left'], ['Time', 'left'], [d.useSpeed ? 'Speed' : 'Pace', 'right']].forEach(([t, a], i) => {
+            OV.text(ctx, t, cols[i], hy, { size: 24 * s, weight: 600, family: F, align: a, color: APPLE.muted });
+          });
+          rows.forEach((r, i) => {
+            const ry = top + head + i * rowH;
+            rule(ctx, x + pad, ry, w - 2 * pad, s, 0.12);
+            const by = ry + rowH * 0.66, fs = (short ? 30 : 36) * s;
+            const pace = d.useSpeed ? `${(3600 / r.paceSecs).toFixed(1)}` : OV.fmtPace(r.paceSecs);
+            OV.text(ctx, r.label, cols[0], by, { size: fs, weight: 600, family: F, align: 'left' });
+            OV.text(ctx, OV.fmtPace(r.secs), cols[1], by, { size: fs, weight: 600, family: F, align: 'left', color: APPLE.yellow });
+            OV.text(ctx, pace, cols[2], by, { size: fs, weight: 600, family: F, align: 'right', color: r.paceSecs === fastest ? APPLE.green : APPLE.cyan });
+          });
+        });
+      },
+    },
+    {
+      id: 'apple-heart',
+      name: 'Heart Rate',
+      desc: 'Apple Fitness inspired: heart-rate graph across the workout, with average and range (elevation if no heart rate).',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, F = OV.INTER;
+        const hr = binSeries(d.route, (p) => p.hr, 120);
+        const ft = d.elev.unit === 'ft';
+        const elev = hr ? null : binSeries(d.route, (p) => (p.ele == null ? null : ft ? p.ele * 3.28084 : p.ele), 120);
+        const vals = hr || elev;
+        const color = hr ? APPLE.red : APPLE.green;
+        const x = 50 * s, w = W - 100 * s, pad = 50 * s;
+        const h = (short ? 0.78 : 0.56) * H;
+        const y = short ? (H - h) / 2 - 20 * s : H - h - 200 * s;
+        darkCard(ctx, x, y, w, h, 48 * s, s);
+        noShadow(ctx, () => {
+          if (hr) heartIcon(ctx, x + pad + 18 * s, y + pad + 22 * s, 22 * s, color);
+          OV.text(ctx, hr ? 'Heart Rate' : 'Elevation', x + pad + (hr ? 50 : 0) * s, y + pad + 34 * s, { size: 38 * s, weight: 600, family: F, align: 'left', color });
+          const big = hr ? d.hr.num : d.elev.num;
+          const bw = OV.text(ctx, big, x + pad, y + pad + 180 * s, { size: 140 * s, weight: 600, family: F, align: 'left' });
+          OV.text(ctx, hr ? 'BPM AVG' : `${d.elev.unit.toUpperCase()} GAIN`, x + pad + bw + 20 * s, y + pad + 180 * s, { size: 34 * s, weight: 600, family: F, align: 'left', color: APPLE.muted });
+          if (vals) {
+            const lo = Math.min(...vals), hi = Math.max(...vals);
+            const range = `${Math.round(lo)}\u2013${Math.round(hi)} ${hr ? 'BPM' : d.elev.unit.toUpperCase()}`;
+            OV.text(ctx, range, x + pad, y + pad + 236 * s, { size: 30 * s, weight: 400, family: F, align: 'left', color: APPLE.muted });
+            const chart = { x: x + pad, y: y + pad + 300 * s, w: w - 2 * pad, h: h - pad * 2 - 360 * s };
+            lineChart(ctx, vals, chart, color, s);
+            OV.text(ctx, '0:00', chart.x, chart.y + chart.h + 44 * s, { size: 24 * s, weight: 400, family: F, align: 'left', color: APPLE.muted });
+            OV.text(ctx, d.time.clock, chart.x + chart.w, chart.y + chart.h + 44 * s, { size: 24 * s, weight: 400, family: F, align: 'right', color: APPLE.muted });
+          }
+        });
+      },
+    },
+
+    // ---------- Garmin inspired ----------
+    {
+      id: 'garmin-zones',
+      name: 'HR Zones',
+      desc: 'Garmin inspired: time in each heart-rate zone as coloured bars (splits if no heart rate).',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, F = OV.INTER;
+        const zones = hrZones(d.route);
+        const x = 50 * s, w = W - 100 * s, pad = 50 * s;
+        const rowH = (short ? 104 : 140) * s, head = 210 * s;
+        const rows = zones ? zones.rows : splitRows(d.splits, 5).map((r) => ({
+          label: `${d.splitsLabel.replace(/s$/, '')} ${r.label}`, sub: d.useSpeed ? `${(3600 / r.paceSecs).toFixed(1)} ${d.pace.unit}` : `${OV.fmtPace(r.paceSecs)} ${d.pace.unit}`,
+          secs: r.secs, color: GARMIN.blue,
+        }));
+        const h = pad + head + rows.length * rowH + pad * 0.6;
+        const y = short ? (H - h) / 2 - 20 * s : H - h - 220 * s;
+        darkCard(ctx, x, y, w, h, 28 * s, s);
+        const total = rows.reduce((a, r) => a + r.secs, 0) || 1;
+        const most = Math.max(...rows.map((r) => r.secs), 1);
+        noShadow(ctx, () => {
+          OV.text(ctx, zones ? 'Heart Rate Zones' : d.splitsLabel, x + pad, y + pad + 42 * s, { size: 46 * s, weight: 600, family: F, align: 'left' });
+          const sub = zones ? `Avg ${d.hr.num} bpm · Max ${zones.max} bpm` : `${d.dist.value} · ${d.time.clock}`;
+          OV.text(ctx, sub, x + pad, y + pad + 96 * s, { size: 28 * s, weight: 400, family: F, align: 'left', color: GARMIN.muted });
+          const bx = x + pad, bw = w - 2 * pad;
+          rows.forEach((r, i) => {
+            const ry = y + pad + head + i * rowH;
+            OV.text(ctx, r.label, bx, ry, { size: 30 * s, weight: 600, family: F, align: 'left' });
+            OV.text(ctx, r.sub, bx + 150 * s, ry, { size: 24 * s, weight: 400, family: F, align: 'left', color: GARMIN.muted });
+            OV.text(ctx, `${OV.fmtPace(r.secs)}  ·  ${Math.round((100 * r.secs) / total)}%`, bx + bw, ry, { size: 28 * s, weight: 600, family: F, align: 'right' });
+            const barY = ry + 18 * s, barH = (short ? 22 : 28) * s;
+            ctx.save();
+            ctx.fillStyle = '#2C2C2E';
+            OV.roundRect(ctx, bx, barY, bw, barH, barH / 2);
+            ctx.fill();
+            ctx.fillStyle = r.color;
+            OV.roundRect(ctx, bx, barY, Math.max(barH, (bw * r.secs) / most), barH, barH / 2);
+            ctx.fill();
+            ctx.restore();
+          });
+        });
+      },
+    },
+    {
+      id: 'garmin-summary',
+      name: 'Connect Summary',
+      desc: 'Garmin inspired: a Garmin Connect style activity card with the route and six stats.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, F = OV.INTER, C = OV.CONDENSED;
+        const x = 50 * s, w = W - 100 * s, pad = 46 * s;
+        const statsH = (short ? 250 : 330) * s, head = 150 * s;
+        const mapH = short ? H * 0.3 : H * 0.36;
+        const h = pad + head + mapH + statsH + pad * 0.4;
+        const y = short ? (H - h) / 2 - 20 * s : H - h - 170 * s;
+        darkCard(ctx, x, y, w, h, 28 * s, s);
+        noShadow(ctx, () => {
+          ctx.save();
+          ctx.fillStyle = GARMIN.blue;
+          OV.roundRect(ctx, x, y, w, 10 * s, 5 * s);
+          ctx.fill();
+          ctx.restore();
+          sportIcon(ctx, x + pad + 44 * s, y + pad + 50 * s, 44 * s, d.useSpeed, GARMIN.blue);
+          const tx = x + pad + 112 * s;
+          OV.text(ctx, d.name, tx, y + pad + 44 * s, { size: 42 * s, weight: 600, family: F, align: 'left', maxWidth: w - pad * 2 - 112 * s });
+          if (d.date) OV.text(ctx, d.date, tx, y + pad + 88 * s, { size: 26 * s, weight: 400, family: F, align: 'left', color: GARMIN.muted });
+          const map = { x: x + pad, y: y + pad + head, w: w - 2 * pad, h: mapH - 30 * s };
+          const pts = OV.drawRoute(ctx, d.route, map, { width: 8 * s * d.rw, color: GARMIN.blue });
+          if (pts.length > 1) {
+            dot(ctx, pts[0], 12 * s, '#3FBF5F');
+            dot(ctx, pts[pts.length - 1], 12 * s, '#E5484D');
+          }
+          const cells = [
+            ['Distance', d.dist.num, d.dist.unit],
+            ['Time', d.time.clock, ''],
+            [d.useSpeed ? 'Avg Speed' : 'Avg Pace', d.pace.num, d.pace.unit],
+            ['Elev Gain', d.elev.num, d.elev.unit],
+            d.hr ? ['Avg HR', d.hr.num, 'bpm'] : ['Elapsed', d.elapsed ? d.elapsed.clock : '—', ''],
+            d.calories ? ['Calories', String(parseInt(d.calories.value, 10)), ''] : d.cadence ? ['Avg Cadence', d.cadence.num, d.cadence.unit] : ['Best ' + (d.dist.unit === 'mi' ? 'Mile' : 'Km'), d.best ? d.best.num : '—', ''],
+          ];
+          const colW = (w - 2 * pad) / 3, sy = y + pad + head + mapH;
+          rule(ctx, x + pad, sy - 10 * s, w - 2 * pad, s, 0.14);
+          cells.forEach(([label, num, unit], i) => {
+            const cx = x + pad + colW * (i % 3);
+            const ry = sy + Math.floor(i / 3) * (statsH / 2);
+            unitValue(ctx, num, unit, cx, ry + (short ? 70 : 92) * s, (short ? 60 : 74) * s, '#FFFFFF', C, 'left', colW - 14 * s);
+            OV.text(ctx, label, cx, ry + (short ? 104 : 132) * s, { size: 24 * s, weight: 400, family: F, align: 'left', color: GARMIN.muted });
+          });
+        });
+      },
+    },
+    {
+      id: 'garmin-elevation',
+      name: 'Elevation Chart',
+      desc: 'Garmin inspired: an elevation chart with gridlines and axis labels, plus ascent and height range.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, F = OV.INTER, C = OV.CONDENSED;
+        const x = 50 * s, w = W - 100 * s, pad = 46 * s;
+        const h = H * (short ? 0.8 : 0.5);
+        const y = short ? (H - h) / 2 - 20 * s : H - h - 220 * s;
+        darkCard(ctx, x, y, w, h, 28 * s, s);
+        const ft = d.elev.unit === 'ft';
+        const conv = (m) => (ft ? m * 3.28084 : m);
+        const prof = (d.profile || []).map((p) => ({ d: p.d, e: conv(p.e) }));
+        noShadow(ctx, () => {
+          OV.text(ctx, 'Elevation', x + pad, y + pad + 40 * s, { size: 44 * s, weight: 600, family: F, align: 'left' });
+          if (prof.length < 2) {
+            OV.text(ctx, 'No elevation in this file', x + pad, y + pad + 100 * s, { size: 28 * s, weight: 400, family: F, align: 'left', color: GARMIN.muted });
+            return;
+          }
+          const es = prof.map((p) => p.e);
+          const lo = Math.min(...es), hi = Math.max(...es);
+          const stats = [['Total Ascent', d.elev.num], ['Max Elev', String(Math.round(hi))], ['Min Elev', String(Math.round(lo))]];
+          const colW = (w - 2 * pad) / 3;
+          stats.forEach(([label, v], i) => {
+            unitValue(ctx, v, d.elev.unit, x + pad + colW * i, y + pad + 140 * s, 64 * s, '#FFFFFF', C, 'left', colW - 10 * s);
+            OV.text(ctx, label, x + pad + colW * i, y + pad + 176 * s, { size: 24 * s, weight: 400, family: F, align: 'left', color: GARMIN.muted });
+          });
+          const chart = { x: x + pad + 70 * s, y: y + pad + 240 * s, w: w - 2 * pad - 70 * s, h: h - pad * 2 - 300 * s };
+          elevationChart(ctx, prof, chart, lo, hi, s, d.dist.unit, F);
+        });
+      },
+    },
   ];
+
+  // ---------- Apple / Garmin inspired helpers ----------
+
+  const APPLE = {
+    red: '#FA114F', green: '#A6FF00', cyan: '#00E5FF', yellow: '#FFD60A', pink: '#FF375F',
+    muted: 'rgba(235,235,245,0.6)',
+  };
+  // Garmin Connect blue and its heart-rate zone colours (zone 1 to 5).
+  const GARMIN = { blue: '#11A9ED', muted: '#9A9A9F', z: ['#9E9E9E', '#1E88E5', '#43A047', '#FB8C00', '#E53935'] };
+
+  const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const shade = (hex, k) => `rgb(${rgbOf(hex).map((v) => Math.round(v * k)).join(',')})`;
+  const withAlpha = (hex, a) => `rgba(${rgbOf(hex).join(',')},${a})`;
+  const clockSecs = (c) => {
+    const p = String(c).split(':').map(Number);
+    return p.some((v) => !isFinite(v)) ? 0 : p.reduce((a, v) => a * 60 + v, 0);
+  };
+
+  // Ring goals: how far distance, moving time and climbing are toward round targets
+  // (bigger for rides). `f` is the fraction (above 1 = past the goal).
+  function ringGoals(d) {
+    const ride = d.useSpeed, mi = d.dist.unit === 'mi', ft = d.elev.unit === 'ft';
+    const dist = parseFloat(d.dist.num) || 0;
+    const mins = clockSecs(d.time.clock) / 60;
+    const elev = parseFloat(d.elev.num) || 0;
+    const dGoal = ride ? (mi ? 30 : 50) : (mi ? 6 : 10);
+    const tGoal = ride ? 120 : 60;
+    const eGoal = ft ? (ride ? 1500 : 300) : (ride ? 500 : 100);
+    return {
+      dist: { f: dist / dGoal, goal: dGoal, text: `${d.dist.num}/${dGoal}${d.dist.unit.toUpperCase()}` },
+      time: { f: mins / tGoal, goal: tGoal, text: `${Math.round(mins)}/${tGoal}MIN` },
+      elev: { f: elev / eGoal, goal: eGoal, text: `${Math.round(elev)}/${eGoal}${(d.elev.unit || 'm').toUpperCase()}` },
+    };
+  }
+
+  // Apple-style activity rings, outermost first: a faint full track, then the progress
+  // arc shading from dark to bright; a second lap goes on top with a shadow at its end.
+  function drawRings(ctx, cx, cy, R, lw, rings) {
+    const start = -Math.PI / 2;
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = lw;
+    rings.forEach((r, i) => {
+      const rad = R - lw / 2 - i * lw * 1.12;
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = r.color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      const f = Math.max(0.005, Math.min(r.f, 2));
+      let paint = r.color;
+      if (ctx.createConicGradient) {
+        paint = ctx.createConicGradient(start, cx, cy);
+        paint.addColorStop(0, shade(r.color, 0.6));
+        paint.addColorStop(Math.min(1, f), r.color);
+        if (f < 1) paint.addColorStop(1, r.color);
+      }
+      ctx.strokeStyle = paint;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, start, start + Math.PI * 2 * Math.min(f, 1));
+      ctx.stroke();
+      if (f > 1) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = lw * 0.4;
+        ctx.strokeStyle = r.color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, start, start + Math.PI * 2 * (f - 1));
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
+    ctx.restore();
+  }
+
+  // Six workout metrics, Apple Watch summary colours: the four basics, then whatever
+  // the file has (heart rate, calories, power, cadence, best split, elapsed time).
+  function appleCells(d) {
+    const u = (v) => String(v || '').toUpperCase();
+    const extras = [
+      d.hr && { label: 'Avg. Heart Rate', num: d.hr.num, unit: 'BPM', color: APPLE.red },
+      d.calories && { label: 'Active Kilocalories', num: String(parseInt(d.calories.value, 10)), unit: 'CAL', color: APPLE.pink },
+      d.power && { label: 'Avg. Power', num: String(parseInt(d.power.value, 10)), unit: 'W', color: APPLE.green },
+      d.cadence && { label: 'Avg. Cadence', num: d.cadence.num, unit: u(d.cadence.unit), color: APPLE.cyan },
+      d.best && { label: d.best.label, num: d.best.num, unit: u(d.best.unit), color: APPLE.cyan },
+      d.elapsed && { label: 'Elapsed Time', num: d.elapsed.clock, unit: '', color: APPLE.yellow },
+    ].filter(Boolean);
+    const blank = { label: '', num: '', unit: '', color: '#FFFFFF' };
+    return [
+      { label: 'Workout Time', num: d.time.clock, unit: '', color: APPLE.yellow },
+      { label: 'Distance', num: d.dist.num, unit: u(d.dist.unit), color: APPLE.cyan },
+      { label: d.useSpeed ? 'Avg. Speed' : 'Avg. Pace', num: d.pace.num, unit: u(d.pace.unit), color: APPLE.cyan },
+      { label: 'Elevation Gain', num: d.elev.num, unit: u(d.elev.unit), color: APPLE.green },
+      extras[0] || blank,
+      extras[1] || blank,
+    ];
+  }
+
+  function darkCard(ctx, x, y, w, h, r, s) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 30 * s;
+    ctx.shadowOffsetY = 8 * s;
+    ctx.fillStyle = 'rgba(18,18,20,0.9)';
+    OV.roundRect(ctx, x, y, w, h, r);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function rule(ctx, x, y, w, s, alpha) {
+    ctx.save();
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.fillRect(x, y, w, Math.max(1, 2 * s));
+    ctx.restore();
+  }
+
+  // A number with a smaller unit after it ("5.08KM"), shrunk to fit `maxW`.
+  function unitValue(ctx, num, unit, x, y, size, color, family, align = 'left', maxW = Infinity) {
+    num = String(num);
+    const us = size * 0.5, gap = unit ? size * 0.08 : 0;
+    const nw = OV.measure(ctx, num, size, 600, 0, family);
+    const uw = unit ? OV.measure(ctx, unit, us, 600, 0, family) : 0;
+    const k = Math.min(1, maxW / (nw + gap + uw || 1));
+    const total = (nw + gap + uw) * k;
+    const x0 = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
+    OV.text(ctx, num, x0, y, { size: size * k, weight: 600, family, align: 'left', color });
+    if (unit) OV.text(ctx, unit, x0 + (nw + gap) * k, y, { size: us * k, weight: 600, family, align: 'left', color });
+  }
+
+  // Round workout icon: a runner, or a bike for rides, in white on a coloured disc.
+  function sportIcon(ctx, cx, cy, r, ride, bg) {
+    const k = (r * 1.25) / 100, X = (v) => cx + (v - 50) * k, Y = (v) => cy + (v - 50) * k;
+    const lines = ride
+      ? [[[26, 68], [44, 44], [66, 44], [74, 68]], [[44, 44], [52, 68], [26, 68]], [[40, 39], [50, 39]], [[66, 44], [63, 33], [72, 33]], [[54, 26], [47, 41]], [[52, 30], [64, 34]]]
+      : [[[55, 32], [45, 60]], [[53, 38], [68, 48], [76, 40]], [[53, 38], [38, 44], [30, 56]], [[45, 60], [60, 72], [56, 90]], [[45, 60], [33, 76], [18, 78]]];
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = ctx.fillStyle = bg === APPLE.green ? '#000000' : '#FFFFFF'; // dark glyph on Apple green
+    ctx.lineWidth = 7 * k;
+    ctx.lineCap = ctx.lineJoin = 'round';
+    for (const l of lines) {
+      ctx.beginPath();
+      l.forEach(([a, b], i) => (i ? ctx.lineTo(X(a), Y(b)) : ctx.moveTo(X(a), Y(b))));
+      ctx.stroke();
+    }
+    if (ride) {
+      for (const wx of [26, 74]) {
+        ctx.beginPath();
+        ctx.arc(X(wx), Y(68), 16 * k, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.beginPath();
+    ctx.arc(X(ride ? 54 : 60), Y(ride ? 18 : 20), (ride ? 7 : 9) * k, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function heartIcon(ctx, cx, cy, sz, color) {
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + sz * 0.9);
+    ctx.bezierCurveTo(cx - sz * 1.9, cy - sz * 0.3, cx - sz * 0.9, cy - sz * 1.6, cx, cy - sz * 0.6);
+    ctx.bezierCurveTo(cx + sz * 0.9, cy - sz * 1.6, cx + sz * 1.9, cy - sz * 0.3, cx, cy + sz * 0.9);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Map dot with a contrasting ring.
+  function dot(ctx, p, r, color) {
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = color === '#FFFFFF' ? 'rgba(0,0,0,0.6)' : '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * 1.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const meters = (a, b) => Math.hypot(
+    (b.lon - a.lon) * 111320 * Math.cos((a.lat * Math.PI) / 180), (b.lat - a.lat) * 111320);
+  // Pace colour: 0 = slowest (red) to 1 = fastest (green).
+  const paceHue = (t) => `hsl(${Math.round(Math.max(0, Math.min(1, t)) * 120)}, 95%, 52%)`;
+
+  // The route coloured by local speed, like Apple Fitness's route map. Speeds are
+  // spread over the 5th-95th percentile so a stop or a sprint doesn't flatten the rest.
+  function paceRoute(ctx, route, box, lw, s) {
+    if (!route || route.length < 2) return;
+    const view = OV.routeView(route, box);
+    const P = (p) => {
+      const la = (p.lat * Math.PI) / 180;
+      return { x: ((p.lon * Math.PI) / 180) * view.sc + view.ox, y: -Math.log(Math.tan(Math.PI / 4 + la / 2)) * view.sc + view.oy };
+    };
+    const step = Math.max(1, Math.floor(route.length / 900));
+    const pts = route.filter((_, i) => i % step === 0);
+    if (pts[pts.length - 1] !== route[route.length - 1]) pts.push(route[route.length - 1]);
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + meters(pts[i - 1], pts[i]));
+    const spd = pts.map((p, i) => {
+      const a = Math.max(0, i - 4), b = Math.min(pts.length - 1, i + 4);
+      const dt = pts[a].time != null && pts[b].time != null ? (pts[b].time - pts[a].time) / 1000 : 0;
+      return dt > 0 ? (cum[b] - cum[a]) / dt : null;
+    });
+    const ok = spd.filter((v) => v != null).sort((a, b) => a - b);
+    const lo = ok.length ? ok[Math.floor(ok.length * 0.05)] : 0;
+    const hi = ok.length ? ok[Math.floor(ok.length * 0.95)] : 0;
+    const xy = pts.map(P);
+    ctx.save();
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.beginPath();
+    xy.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; // dark casing so the colours read on photos
+    ctx.lineWidth = lw + 6 * s;
+    ctx.stroke();
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = lw;
+    for (let i = 0; i < xy.length - 1; i++) {
+      const v = spd[i] != null ? spd[i] : spd[i + 1];
+      ctx.strokeStyle = v == null || hi <= lo ? paceHue(0.5) : paceHue((v - lo) / (hi - lo));
+      ctx.beginPath();
+      ctx.moveTo(xy[i].x, xy[i].y);
+      ctx.lineTo(xy[i + 1].x, xy[i + 1].y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    dot(ctx, xy[0], lw * 0.8, '#FFFFFF');
+  }
+
+  // Splits as table rows ({ label, secs, dist, paceSecs }), merged into at most `max`
+  // rows; a short last split is labelled by its distance.
+  function splitRows(splits, max) {
+    const rows = (splits || []).map((sp) => ({ label: sp.dist < 0.995 ? sp.dist.toFixed(2) : sp.label, secs: sp.secs, dist: sp.dist }));
+    const k = Math.max(1, Math.ceil(rows.length / max));
+    const out = [];
+    for (let i = 0; i < rows.length; i += k) {
+      const c = rows.slice(i, i + k);
+      const secs = c.reduce((a, r) => a + r.secs, 0), dist = c.reduce((a, r) => a + r.dist, 0);
+      out.push({ label: c.length > 1 ? `${c[0].label}-${c[c.length - 1].label}` : c[0].label, secs, dist, paceSecs: secs / dist });
+    }
+    return out;
+  }
+
+  // `n` averaged values across the activity (by point order); null when the file has
+  // the value on fewer than half of them.
+  function binSeries(route, get, n) {
+    const pts = route || [];
+    if (pts.length < 2) return null;
+    const out = [];
+    for (let b = 0; b < n; b++) {
+      let sum = 0, c = 0;
+      for (let i = Math.floor((b * pts.length) / n); i < Math.floor(((b + 1) * pts.length) / n); i++) {
+        const v = get(pts[i]);
+        if (v != null && isFinite(v)) { sum += v; c++; }
+      }
+      out.push(c ? sum / c : null);
+    }
+    const good = out.filter((v) => v != null);
+    if (good.length < n / 2) return null;
+    let last = good[0];
+    return out.map((v) => (v == null ? last : (last = v)));
+  }
+
+  // Filled line chart with faint gridlines.
+  function lineChart(ctx, vals, box, color, s) {
+    const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+    const pts = vals.map((v, i) => ({
+      x: box.x + (box.w * i) / (vals.length - 1),
+      y: box.y + box.h * 0.95 - ((v - lo) / span) * box.h * 0.9,
+    }));
+    const path = () => {
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    };
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    for (let i = 0; i <= 3; i++) ctx.fillRect(box.x, box.y + (box.h * i) / 3, box.w, Math.max(1, 1.5 * s));
+    path();
+    ctx.lineTo(box.x + box.w, box.y + box.h);
+    ctx.lineTo(box.x, box.y + box.h);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, box.y, 0, box.y + box.h);
+    g.addColorStop(0, withAlpha(color, 0.45));
+    g.addColorStop(1, withAlpha(color, 0));
+    ctx.fillStyle = g;
+    ctx.fill();
+    path();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 5 * s;
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Time in the five heart-rate zones (% of max HR: 50/60/70/80/90). Max HR is the
+  // higher of the activity's peak and 190, since the file has no age or profile.
+  function hrZones(route) {
+    const pts = (route || []).filter((p) => p.hr != null && p.time != null);
+    if (pts.length < 10) return null;
+    const maxObs = Math.max(...pts.map((p) => p.hr));
+    const hrMax = Math.max(maxObs, 190);
+    const bounds = [0.5, 0.6, 0.7, 0.8, 0.9];
+    const secs = [0, 0, 0, 0, 0];
+    for (let i = 1; i < pts.length; i++) {
+      const dt = Math.min(10, Math.max(0, (pts[i].time - pts[i - 1].time) / 1000));
+      const f = pts[i].hr / hrMax;
+      let z = 0;
+      for (let k = 0; k < 5; k++) if (f >= bounds[k]) z = k;
+      secs[z] += dt;
+    }
+    const rows = [4, 3, 2, 1, 0].map((z) => ({
+      label: `Zone ${z + 1}`,
+      sub: z === 4 ? `> ${Math.round(hrMax * 0.9)} bpm` : `${Math.round(hrMax * bounds[z])}–${Math.round(hrMax * bounds[z + 1])} bpm`,
+      secs: secs[z],
+      color: GARMIN.z[z],
+    }));
+    return { rows, max: Math.round(maxObs) };
+  }
+
+  const niceStep = (x) => {
+    const p = 10 ** Math.floor(Math.log10(x)), n = x / p;
+    return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * p;
+  };
+
+  // Garmin Connect style elevation chart: dashed gridlines with height labels, a
+  // green filled profile and distance labels underneath. `prof` is [{ d: metres, e }].
+  function elevationChart(ctx, prof, box, lo, hi, s, distUnit, F) {
+    const step = niceStep(Math.max(10, hi - lo) / 3);
+    const y0 = Math.floor(lo / step) * step, y1 = Math.max(y0 + step, Math.ceil(hi / step) * step);
+    const maxD = prof[prof.length - 1].d || 1;
+    const X = (m) => box.x + (m / maxD) * box.w;
+    const Y = (e) => box.y + box.h - ((e - y0) / (y1 - y0)) * box.h;
+    const green = '#4CAF50';
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.setLineDash([6 * s, 6 * s]);
+    ctx.lineWidth = Math.max(1, 1.5 * s);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    for (let v = y0; v <= y1 + 1e-6; v += step) {
+      ctx.beginPath();
+      ctx.moveTo(box.x, Y(v));
+      ctx.lineTo(box.x + box.w, Y(v));
+      ctx.stroke();
+      OV.text(ctx, String(Math.round(v)), box.x - 14 * s, Y(v) + 8 * s, { size: 22 * s, weight: 400, family: F, align: 'right', color: GARMIN.muted });
+    }
+    ctx.setLineDash([]);
+    const st = Math.max(1, Math.floor(prof.length / 400));
+    const pts = prof.filter((_, i) => i % st === 0).map((p) => ({ x: X(p.d), y: Y(p.e) }));
+    ctx.beginPath();
+    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.lineTo(pts[pts.length - 1].x, box.y + box.h);
+    ctx.lineTo(pts[0].x, box.y + box.h);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, box.y, 0, box.y + box.h);
+    g.addColorStop(0, withAlpha(green, 0.6));
+    g.addColorStop(1, withAlpha(green, 0.12));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.beginPath();
+    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.strokeStyle = green;
+    ctx.lineWidth = 4 * s;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    const unitM = distUnit === 'mi' ? 1609.344 : 1000;
+    [[0, 'left'], [0.5, 'center'], [1, 'right']].forEach(([f, align]) => {
+      OV.text(ctx, `${((maxD * f) / unitM).toFixed(f ? 1 : 0)} ${distUnit}`, X(maxD * f), box.y + box.h + 38 * s, {
+        size: 22 * s, weight: 400, family: F, align, color: GARMIN.muted,
+      });
+    });
+    ctx.restore();
+  }
+
+  // Every stat the GPX file gives, as [label, value] rows; rows without data drop out.
+  function allStats(d) {
+    const pts = d.route || [];
+    const vals = (get) => pts.map(get).filter((v) => v != null && isFinite(v));
+    const ft = d.elev.unit === 'ft';
+    const ele = vals((p) => p.ele).map((e) => (ft ? e * 3.28084 : e));
+    const hrs = vals((p) => p.hr);
+    const first = pts.find((p) => p.time != null);
+    const start = first ? new Date(first.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null;
+    const elevUnit = ` ${d.elev.unit}`;
+    return [
+      d.date && ['Date', d.date],
+      start && ['Start time', start],
+      d.location && ['Location', d.location],
+      ['Distance', d.dist.value],
+      ['Moving time', d.time.clock],
+      d.elapsed && ['Elapsed time', d.elapsed.clock],
+      ['Avg pace', `${d.useSpeed ? OV.fmtPace(3600 / parseFloat(d.speed.num)) : d.pace.num} /${d.dist.unit}`],
+      ['Avg speed', d.speed.value],
+      d.best && [d.best.label, `${d.best.num} ${d.best.unit}`],
+      ['Elevation gain', d.elev.value],
+      ele.length && ['Max elevation', `${Math.round(Math.max(...ele))}${elevUnit}`],
+      ele.length && ['Min elevation', `${Math.round(Math.min(...ele))}${elevUnit}`],
+      d.hr && ['Avg heart rate', `${d.hr.num} bpm`],
+      hrs.length && ['Max heart rate', `${Math.round(Math.max(...hrs))} bpm`],
+      d.cadence && ['Avg cadence', `${d.cadence.num} ${d.cadence.unit}`],
+      d.power && ['Avg power', d.power.value],
+      d.splits && d.splits.length && [d.splitsLabel, String(d.splits.length)],
+      ['Track points', pts.length.toLocaleString('en-US')],
+    ].filter(Boolean);
+  }
 
   // Runs `fn` with the page-wide text shadow turned off (dark text on white cards).
   function noShadow(ctx, fn) {
@@ -1106,75 +1798,6 @@ window.OV = window.OV || {};
     OV.stack(ctx, items, x, y, o);
   }
 
-  // Liquid-glass panel (iOS 26 style): a rounded shape that blurs and brightens
-  // whatever is already on the canvas behind it (the preview photo, when there is
-  // one), a light frosted tint, a bright gradient rim, a soft top glare, and a drop
-  // shadow kept outside the shape so it doesn't darken the glass.
-  function glass(ctx, x, y, w, h, r, s, tint = 0.12) {
-    r = Math.min(r, w / 2, h / 2);
-    // Adds the rounded rectangle to the current path (no beginPath, unlike OV.roundRect).
-    const outline = () => {
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
-      ctx.closePath();
-    };
-    // Shadow, outside the shape only (clip to the canvas minus the shape).
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    outline();
-    ctx.clip('evenodd');
-    ctx.shadowColor = 'rgba(0,0,0,0.28)';
-    ctx.shadowBlur = 40 * s;
-    ctx.shadowOffsetY = 14 * s;
-    ctx.beginPath();
-    outline();
-    ctx.fillStyle = '#000';
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    ctx.shadowColor = 'transparent';
-    ctx.beginPath();
-    outline();
-    ctx.clip();
-    // Frost: re-draw what's behind, blurred and a little brighter. Browsers without
-    // canvas filters just skip the blur.
-    ctx.filter = `blur(${Math.round(22 * s)}px) saturate(1.5) brightness(1.1)`;
-    ctx.drawImage(ctx.canvas, 0, 0);
-    ctx.filter = 'none';
-    // Tint, lighter at the top.
-    const g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, `rgba(255,255,255,${tint + 0.1})`);
-    g.addColorStop(1, `rgba(255,255,255,${tint})`);
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y, w, h);
-    // Glare across the top.
-    const glare = ctx.createRadialGradient(x + w * 0.3, y, 0, x + w * 0.3, y, Math.max(w, h) * 0.7);
-    glare.addColorStop(0, 'rgba(255,255,255,0.22)');
-    glare.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = glare;
-    ctx.fillRect(x, y, w, h);
-    ctx.restore();
-
-    // Rim: bright at the top-left and bottom-right edges, faint in between.
-    ctx.save();
-    ctx.shadowColor = 'transparent';
-    const rim = ctx.createLinearGradient(x, y, x + w, y + h);
-    rim.addColorStop(0, 'rgba(255,255,255,0.85)');
-    rim.addColorStop(0.35, 'rgba(255,255,255,0.15)');
-    rim.addColorStop(0.65, 'rgba(255,255,255,0.12)');
-    rim.addColorStop(1, 'rgba(255,255,255,0.55)');
-    OV.roundRect(ctx, x + s, y + s, w - 2 * s, h - 2 * s, r);
-    ctx.strokeStyle = rim;
-    ctx.lineWidth = Math.max(1, 2.5 * s);
-    ctx.stroke();
-    ctx.restore();
-  }
-
   // A ▼ marker just above point `p` on an elevation profile, with a title and the
   // elevation beside it (to the left near the right edge).
   function profileMarker(ctx, p, title, sub, s, rgb, W) {
@@ -1358,10 +1981,12 @@ window.OV = window.OV || {};
     { id: 'clubs', name: 'CLUBS' },
     { id: 'white', name: 'WHITE' },
     { id: 'map', name: 'MAP' },
-    { id: 'other', name: 'OTHER' },
+    { id: 'apple', name: 'APPLE' },
+    { id: 'garmin', name: 'GARMIN' },
+    { id: 'other', name: 'OTHERS' },
   ];
   // Template id prefix -> tab. The club layouts (TTRC, KL Bisiklista, APIMYCC) share CLUBS.
-  const PREFIX_GROUP = { ttrc: 'clubs', kl: 'clubs', apimycc: 'clubs', white: 'white', map: 'map', course: 'other', glass: 'other' };
+  const PREFIX_GROUP = { ttrc: 'clubs', kl: 'clubs', apimycc: 'clubs', white: 'white', map: 'map', apple: 'apple', garmin: 'garmin', course: 'other' };
   for (const t of templates) {
     const prefix = (t.id.match(/^([a-z]+)-/) || [])[1]; // "ttrc-side" -> ttrc; "map" has none
     t.group = PREFIX_GROUP[prefix] || 'strava';

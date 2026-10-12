@@ -457,46 +457,110 @@ window.OV = window.OV || {};
       name: 'Course Data',
       desc: 'A spec-sheet table of four stats over a lime elevation profile with start and high-point markers.',
       draw(ctx, W, H, d) {
-        const s = W / 1080, F = OV.DIN, LIME = '205,234,45';
-        const short = H / W < 1.5;
-        const up = (v) => String(v).toUpperCase();
-        // Runs: distance, pace, time, climbing. Rides: distance, climbing, time, speed.
-        const elev = d.elev.num === '—' ? d.elev.value : `${Number(d.elev.num).toLocaleString('en-US')} ${d.elev.unit}`;
-        const rows = d.useSpeed
-          ? [['Total distance', d.dist.value], ['Elevation gain', elev], ['Moving time', d.time.clock], ['Avg speed', d.pace.value]]
-          : [['Total distance', d.dist.value], ['Avg pace', d.pace.value], ['Moving time', d.time.clock], ['Elevation gain', elev]];
-
-        // Header and table, rules above each row.
+        courseLayout(ctx, W, H, d, false);
+      },
+    },
+    {
+      id: 'course-route',
+      name: 'Course Route',
+      desc: 'Course Data with the route drawn in the middle as a thin lime line, like the elevation profile.',
+      draw(ctx, W, H, d) {
+        courseLayout(ctx, W, H, d, true);
+      },
+    },
+    {
+      id: 'course-line',
+      name: 'Race Line',
+      desc: 'Minimal ink-line look: a heart-rate line (elevation without heart rate) from an open start dot to a solid finish dot, the title, a rule and three stats.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, F = OV.DIN;
         const x0 = W * 0.1, x1 = W * 0.9;
-        const fs = 33 * s, sp = 2.5 * s, rowH = (short ? 66 : 82) * s;
-        const cell = (str, x, y, align, color, alpha) => OV.text(ctx, up(str), align === 'right' ? x + sp : x, y, {
-          size: fs, weight: 500, family: F, align, spacing: sp, color, alpha, maxWidth: (x1 - x0) * 0.6,
-        });
-        let y = H * (short ? 0.06 : 0.05) + fs;
-        cell(d.useSpeed ? 'Ride' : 'Run', x0, y, 'left');
-        cell(d.name, x1, y, 'right', `rgb(${LIME})`);
-        y += fs * 1.25;
-        cell('Data', x0, y, 'left');
-        if (d.date) cell(d.date, x1, y, 'right', null, 0.6);
-        y += rowH * 0.45;
-        for (const [label, value] of rows) {
-          hairline(ctx, x0, y, x1 - x0, s);
-          y += rowH * 0.5 + fs * 0.36;
-          cell(label, x0, y, 'left');
-          cell(value, x1, y, 'right');
-          y += rowH * 0.5 - fs * 0.36;
+        const titleSize = 66 * s, statSize = 54 * s, lw = 4 * s;
+        // Laid out bottom-up so the block sits in the lower part of the frame.
+        const statsY = H - H * 0.09;
+        const ruleY = statsY - statSize - 34 * s;
+        const titleY = ruleY - 34 * s;
+        const ph = W * 0.22;
+        const profBox = { x: x0 + 14 * s, y: titleY - titleSize - 56 * s - ph, w: x1 - x0 - 28 * s, h: ph };
+
+        // Heart rate across the activity; elevation when the file has no heart rate.
+        const hr = binSeries(d.route, (p) => p.hr, 120);
+        const series = hr ? hr.map((e, i) => ({ d: i, e })) : d.profile;
+        const prof = OV.drawProfile(ctx, series, profBox, { width: lw, rgb: '255,255,255', fill: false, minRange: 20 });
+        if (prof) {
+          const a = prof.pts[0], b = prof.pts[prof.pts.length - 1], r = 12 * s;
+          ctx.save();
+          ctx.shadowColor = 'transparent';
+          ctx.lineWidth = lw;
+          ctx.strokeStyle = ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
+          ctx.stroke(); // start: open circle
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, r * 1.15, 0, Math.PI * 2);
+          ctx.fill(); // finish: solid dot
+          ctx.restore();
         }
 
-        // Elevation profile along the bottom, with the start and the high point marked.
-        const ph = H * (short ? 0.26 : 0.22);
-        const prof = OV.drawProfile(ctx, d.profile, { x: 0, y: H - ph, w: W, h: ph }, { width: 4 * s, rgb: LIME, minRange: 30 });
-        if (!prof) return;
-        const toUnit = (m) => `${Math.round(d.elev.unit === 'ft' ? m * 3.28084 : m).toLocaleString('en-US')} ${d.elev.unit}`;
-        const top = prof.samples.indexOf(Math.max(...prof.samples));
-        const peak = prof.pts[top];
-        profileMarker(ctx, peak, 'High point', toUnit(prof.samples[top]), s, LIME, W);
-        if (peak.x - prof.pts[0].x > W * 0.3) {
-          profileMarker(ctx, prof.pts[0], isLoop(d.route) ? 'Start / Finish' : 'Start', toUnit(prof.samples[0]), s, LIME, W);
+        OV.text(ctx, d.name.toUpperCase(), x0, titleY, {
+          size: titleSize, weight: 500, family: F, align: 'left', spacing: 6 * s, maxWidth: x1 - x0,
+        });
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(x0, ruleY, x1 - x0, Math.max(1, 3 * s));
+        ctx.restore();
+        const o = { size: statSize, weight: 500, family: F, spacing: 1 * s };
+        OV.text(ctx, d.dist.value, x0, statsY, { ...o, align: 'left' });
+        OV.text(ctx, d.pace.value, (x0 + x1) / 2, statsY, { ...o, align: 'center' });
+        OV.text(ctx, d.time.clock, x1, statsY, { ...o, align: 'right' });
+      },
+    },
+    {
+      id: 'course-contents',
+      name: 'Contents',
+      desc: 'A table-of-contents list: monospace title, bold labels, dot leaders and monospace figures, with the location beneath.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080;
+        const x0 = W * 0.08, x1 = W * 0.92;
+        const labelSize = 54 * s, valSize = 50 * s, rowH = 72 * s;
+        const titleSize = 48 * s, titleGap = 110 * s, locGap = 96 * s;
+        const mono = { size: valSize, weight: 500, family: OV.MONO, align: 'left' };
+        const fig = (v) => String(v).toUpperCase().replace(/\s+/g, ''); // "5.08 km" -> "5.08KM"
+        const rows = [
+          ['Distance', d.dist.value],
+          [d.useSpeed ? 'Speed' : 'Pace', d.pace.value],
+          ['Time', d.time.clock],
+          ['Elevation', d.elev.value],
+          d.hr && ['Heart rate', `${d.hr.num}bpm`],
+          d.cadence && ['Cadence', `${d.cadence.num}${d.cadence.unit}`],
+          d.power && ['Power', d.power.value],
+          d.calories && ['Calories', d.calories.value],
+        ].filter(Boolean).map(([l, v]) => [l.toUpperCase(), fig(v)]);
+
+        // Figures share a left edge, as far right as the widest one allows.
+        const valX = x1 - Math.max(...rows.map(([, v]) => OV.measure(ctx, v, valSize, 500, 0, OV.MONO)));
+        const dotW = OV.measure(ctx, '.', valSize, 500, 0, OV.MONO);
+        // Laid out bottom-up so the block sits in the lower part of the frame:
+        // title, the list, then the location (when known) centred under it.
+        const loc = d.location ? d.location.toUpperCase() : '';
+        let y = H - H * 0.1 - (loc ? locGap : 0) - rowH * (rows.length - 1);
+        OV.text(ctx, d.name.toUpperCase(), (x0 + x1) / 2, y - titleGap, {
+          size: titleSize, weight: 500, family: OV.MONO, align: 'center', spacing: 6 * s, maxWidth: x1 - x0,
+        });
+        if (loc) {
+          OV.text(ctx, loc, (x0 + x1) / 2, y + rowH * (rows.length - 1) + locGap, {
+            size: labelSize, weight: 800, family: OV.INTER, align: 'center', maxWidth: x1 - x0,
+          });
+        }
+        for (const [label, value] of rows) {
+          const lw = OV.text(ctx, label, x0, y, {
+            size: labelSize, weight: 800, family: OV.INTER, align: 'left', maxWidth: (valX - x0) * 0.75,
+          });
+          // Dot leaders from just after the label up to the figures.
+          const n = Math.floor((valX - (x0 + lw + 10 * s)) / dotW);
+          if (n > 0) OV.text(ctx, '.'.repeat(n), valX, y, { ...mono, align: 'right' });
+          OV.text(ctx, value, valX, y, mono);
+          y += rowH;
         }
       },
     },
@@ -1817,6 +1881,82 @@ window.OV = window.OV || {};
     const align = left ? 'right' : 'left';
     OV.text(ctx, title.toUpperCase(), x, ty - 2 * s, { size: 26 * s, weight: 600, family: OV.DIN, align, spacing: 2 * s });
     OV.text(ctx, sub.toUpperCase(), x, ty + 28 * s, { size: 22 * s, weight: 500, family: OV.DIN, align, spacing: 1.5 * s, alpha: 0.75 });
+  }
+
+  // Course Data / Course Route: a spec-sheet table of four stats over a lime elevation
+  // profile. With `withRoute`, the route fills the gap between them in the same lime.
+  function courseLayout(ctx, W, H, d, withRoute) {
+    const s = W / 1080, F = OV.DIN, LIME = '205,234,45';
+    const short = H / W < 1.5;
+    const up = (v) => String(v).toUpperCase();
+    // Runs: distance, pace, time, climbing. Rides: distance, climbing, time, speed.
+    const elev = d.elev.num === '—' ? d.elev.value : `${Number(d.elev.num).toLocaleString('en-US')} ${d.elev.unit}`;
+    const rows = d.useSpeed
+      ? [['Total distance', d.dist.value], ['Elevation gain', elev], ['Moving time', d.time.clock], ['Avg speed', d.pace.value]]
+      : [['Total distance', d.dist.value], ['Avg pace', d.pace.value], ['Moving time', d.time.clock], ['Elevation gain', elev]];
+
+    // Header and table, rules above each row.
+    const x0 = W * 0.1, x1 = W * 0.9;
+    const fs = 33 * s, sp = 2.5 * s, rowH = (short ? 66 : 82) * s;
+    const cell = (str, x, y, align, color, alpha) => OV.text(ctx, up(str), align === 'right' ? x + sp : x, y, {
+      size: fs, weight: 500, family: F, align, spacing: sp, color, alpha, maxWidth: (x1 - x0) * 0.6,
+    });
+    let y = H * (short ? 0.06 : 0.05) + fs;
+    cell(d.useSpeed ? 'Ride' : 'Run', x0, y, 'left');
+    cell(d.name, x1, y, 'right', `rgb(${LIME})`);
+    y += fs * 1.25;
+    cell('Data', x0, y, 'left');
+    if (d.date) cell(d.date, x1, y, 'right', null, 0.6);
+    y += rowH * 0.45;
+    for (const [label, value] of rows) {
+      hairline(ctx, x0, y, x1 - x0, s);
+      y += rowH * 0.5 + fs * 0.36;
+      cell(label, x0, y, 'left');
+      cell(value, x1, y, 'right');
+      y += rowH * 0.5 - fs * 0.36;
+    }
+
+    const ph = H * (short ? 0.26 : 0.22);
+
+    // Route between the table and the profile (leaving room for the profile's markers),
+    // as a thin lime line like the profile's.
+    if (withRoute) {
+      const top = y + 50 * s, bottom = H - ph - 70 * s;
+      if (bottom - top > 80 * s) {
+        const box = { x: x0, y: top, w: x1 - x0, h: bottom - top };
+        const pts = OV.drawRoute(ctx, d.route, box, { width: 5 * s * d.rw, color: `rgb(${LIME})` });
+        if (pts.length) {
+          // Start: solid lime dot. Finish: lime ring (skipped on a loop, where they meet).
+          const r = 9 * s;
+          ctx.save();
+          ctx.shadowColor = 'transparent';
+          ctx.fillStyle = `rgb(${LIME})`;
+          ctx.beginPath();
+          ctx.arc(pts[0].x, pts[0].y, r, 0, Math.PI * 2);
+          ctx.fill();
+          if (!isLoop(d.route)) {
+            const e = pts[pts.length - 1];
+            ctx.strokeStyle = `rgb(${LIME})`;
+            ctx.lineWidth = 4 * s;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+    }
+
+    // Elevation profile along the bottom, with the start and the high point marked.
+    const prof = OV.drawProfile(ctx, d.profile, { x: 0, y: H - ph, w: W, h: ph }, { width: 4 * s, rgb: LIME, minRange: 30 });
+    if (!prof) return;
+    const toUnit = (m) => `${Math.round(d.elev.unit === 'ft' ? m * 3.28084 : m).toLocaleString('en-US')} ${d.elev.unit}`;
+    const top = prof.samples.indexOf(Math.max(...prof.samples));
+    const peak = prof.pts[top];
+    profileMarker(ctx, peak, 'High point', toUnit(prof.samples[top]), s, LIME, W);
+    if (peak.x - prof.pts[0].x > W * 0.3) {
+      profileMarker(ctx, prof.pts[0], isLoop(d.route) ? 'Start / Finish' : 'Start', toUnit(prof.samples[0]), s, LIME, W);
+    }
   }
 
   // True when the route ends within ~250 m of where it started.

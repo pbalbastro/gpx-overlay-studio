@@ -13,6 +13,8 @@ window.OV = window.OV || {};
   const HAND = '"Gaegu", "Chalkboard SE", "Comic Sans MS", cursive';
   // DIN-style grotesque for spec-sheet layouts (Course Data).
   const DIN = '"Barlow", "DIN Alternate", "Helvetica Neue", Arial, sans-serif';
+  // Monospace for dot leaders and figures (Contents).
+  const MONO = '"IBM Plex Mono", "SF Mono", Menlo, monospace';
 
   function font(ctx, size, weight, family = FONT) {
     ctx.font = `${weight} ${Math.max(1, size).toFixed(1)}px ${family}`;
@@ -455,7 +457,7 @@ window.OV = window.OV || {};
   // ---------- elevation profile ----------
 
   // Elevation profile filling `box`, fading downward. `o.rgb` sets the colour as
-  // "r,g,b" (Strava orange by default). Returns the plotted points and their
+  // "r,g,b" (Strava orange by default); `o.fill: false` draws the line only. Returns the plotted points and their
   // elevations (null without a profile), for placing markers.
   function drawProfile(ctx, profile, box, o = {}) {
     if (!profile || profile.length < 2) return null;
@@ -481,19 +483,21 @@ window.OV = window.OV || {};
       y: box.y + box.h - ((e - lo) / (hi - lo)) * box.h * 0.85,
     }));
 
-    ctx.save();
-    ctx.shadowColor = 'transparent';
-    const g = ctx.createLinearGradient(0, box.y, 0, box.y + box.h);
-    const rgb = o.rgb || '252,76,2';
-    g.addColorStop(0, `rgba(${rgb},0.55)`);
-    g.addColorStop(1, `rgba(${rgb},0)`);
-    trace(ctx, pts);
-    ctx.lineTo(box.x + box.w, box.y + box.h);
-    ctx.lineTo(box.x, box.y + box.h);
-    ctx.closePath();
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.restore();
+    if (o.fill !== false) {
+      ctx.save();
+      ctx.shadowColor = 'transparent';
+      const g = ctx.createLinearGradient(0, box.y, 0, box.y + box.h);
+      const rgb = o.rgb || '252,76,2';
+      g.addColorStop(0, `rgba(${rgb},0.55)`);
+      g.addColorStop(1, `rgba(${rgb},0)`);
+      trace(ctx, pts);
+      ctx.lineTo(box.x + box.w, box.y + box.h);
+      ctx.lineTo(box.x, box.y + box.h);
+      ctx.closePath();
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.restore();
+    }
 
     ctx.save();
     trace(ctx, pts);
@@ -527,7 +531,7 @@ window.OV = window.OV || {};
   }
 
   Object.assign(OV, {
-    WHITE, ORANGE, CONDENSED, INTER, HAND, DIN, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
+    WHITE, ORANGE, CONDENSED, INTER, HAND, DIN, MONO, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
     drawRoute, drawProfile, roundRect, drawCover, routeView, fitRoute,
   });
 })(window.OV);

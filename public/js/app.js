@@ -160,6 +160,22 @@
     }
   }
 
+  // Phones: the cards take whatever height the tabs, buttons and save note leave free.
+  // The note is two lines in some browsers and four with the iOS "Save to Photos"
+  // wording, so the space is measured rather than guessed (sets --card-h, style.css).
+  function fitCards() {
+    const grid = $('grid');
+    if (!isPhoneLayout()) { grid.style.removeProperty('--card-h'); return; }
+    const stage = document.querySelector('.stage');
+    const card = grid.querySelector('.thumb-wrap:not([hidden]) .thumb-canvas');
+    if (!card) return;
+    const cs = getComputedStyle(stage);
+    const used = [...stage.children].reduce((sum, el) => sum + el.offsetHeight, 0) +
+      parseFloat(cs.rowGap) * (stage.children.length - 1) + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const h = card.offsetHeight + stage.clientHeight - used;
+    grid.style.setProperty('--card-h', `${Math.max(160, Math.floor(h))}px`);
+  }
+
   // Once a swipe settles, select the card nearest the middle.
   function wireCarousel() {
     const grid = $('grid');
@@ -184,9 +200,11 @@
       setHowto(false);
       placeHowto();
       renderAll();
+      fitCards();
       centerSelected(false);
       shapeCarousel();
     });
+    window.addEventListener('resize', () => { fitCards(); shapeCarousel(); });
   }
 
   function select(id) {
@@ -228,6 +246,7 @@
       el.querySelector('.thumb-canvas').style.aspectRatio = `${W} / ${H}`;
       paint(el.querySelector('canvas'), t, tw, Math.round((tw * H) / W), d, opts, state.bg);
     }
+    fitCards(); // the canvas size may have changed
     renderPreview();
     renderInfo(d);
   }

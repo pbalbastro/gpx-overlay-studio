@@ -442,12 +442,15 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
     display: flex;
     flex-direction: column;
     align-items: stretch; /* desktop's align-items: start would size rows to their content */
-    justify-content: center; /* keep title, tabs, carousel and buttons together */
+    /* top-aligned: centring pushed the tabs up under the top bar whenever the
+       column was taller than the screen (app.js sizes the cards to fit) */
+    justify-content: flex-start;
     isolation: isolate; /* card z-indexes (app.js) stay below the settings sheet */
     gap: 10px;
     /* one screen under the 52px top bar */
     height: calc(100vh - 52px);
     height: calc(100dvh - 52px);
+    padding-top: 10px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
   .preview { display: none; }
@@ -467,7 +470,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
     /* Card width: 70% of the screen, or less if a card that wide would be too tall.
        --ar is the canvas width / height, set by app.js. Neighbours overlap by
        --tuck so their shrunken versions sit close beside the middle card. */
-    --card-w: min(70vw, calc((100dvh - 260px) * var(--ar, 0.5625)));
+    --card-w: min(70vw, calc(var(--card-h, (100dvh - 260px)) * var(--ar, 0.5625)));
     --tuck: calc(var(--card-w) * 0.1);
     position: relative; /* card offsets are measured against the carousel */
     display: flex;

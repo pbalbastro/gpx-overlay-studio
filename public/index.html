@@ -33,8 +33,10 @@
       <!-- On phones the drop zone and demo link sit on one compact row. -->
       <div class="upload-row">
         <label class="drop" id="drop">
-          <!-- No accept filter: iOS doesn't know the .gpx type and greys the files out. -->
-          <input type="file" id="gpxInput" hidden />
+          <!-- iOS doesn't know the .gpx type, so ".gpx" alone greys the files out; octet-stream keeps
+               them selectable, and having no image/video types makes iOS open Files directly
+               instead of offering Photo Library / Take Photo. -->
+          <input type="file" id="gpxInput" accept=".gpx,application/gpx+xml,application/octet-stream" hidden />
           <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7l5-5zm-7 14h14v4H5v-4z"/></svg>
           <strong><span class="wide-only">Drop a GPX file</span><span class="phone-only">Upload GPX</span></strong>
           <span class="wide-only">or click to browse</span>

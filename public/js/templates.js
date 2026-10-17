@@ -734,6 +734,136 @@ window.OV = window.OV || {};
       },
     },
 
+    // ---------- APIMY running club ("STRAVA | APIMY" lockup), running stats ----------
+    {
+      id: 'apimy-classic',
+      name: 'APIMY Classic',
+      desc: 'Centered running stats and route with the STRAVA | APIMY lockup.',
+      draw(ctx, W, H, d) {
+        classicLayout(ctx, W, H, d, [d.dist, d.pace, d.time],
+          (x, y, s) => OV.lockup(ctx, d, x, y, 54 * s, 'center', W * 0.84, 'apimy'));
+      },
+    },
+    {
+      id: 'apimy-bar',
+      name: 'APIMY Run Bar',
+      desc: 'Lockup up top, big route, four-stat run bar along the bottom.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const lb = H * 0.08 + 44 * s;
+        OV.lockup(ctx, d, cx, lb, 54 * s, 'center', W * 0.84, 'apimy');
+        const rowTop = H - 110 * s - (28 * 0.8 + 56 * 1.05) * s;
+        OV.row(ctx, [d.dist, d.pace, d.elev, d.time], 30 * s, W - 60 * s, rowTop, {
+          labelSize: 28 * s, valueSize: 56 * s, dividers: true,
+        });
+        const top = lb + 110 * s, avail = rowTop - 90 * s - top;
+        const rh = Math.max(0, Math.min(H * 0.4, avail));
+        OV.drawRoute(ctx, d.route, { x: W * 0.12, y: top + (avail - rh) / 2, w: W * 0.76, h: rh }, {
+          width: 13 * s * d.rw, markers: true,
+        });
+      },
+    },
+    {
+      id: 'apimy-side',
+      name: 'APIMY Side',
+      desc: 'Route on the left; lockup and a stat column on the right.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080;
+        const rw = W * 0.38, rh = H * 0.24;
+        OV.drawRoute(ctx, d.route, { x: W * 0.07, y: H / 2 - rh / 2, w: rw, h: rh }, { width: 12 * s * d.rw });
+
+        const x = W * 0.52, colW = W * 0.42;
+        const o = { labelSize: 26 * s, valueSize: 54 * s, gap: 34 * s, align: 'left', labelWeight: 700, maxWidth: colW };
+        const items = [d.dist, d.pace, d.time];
+        const logoSize = 44 * s, logoGap = 80 * s;
+        const top = H / 2 - (logoSize * 0.72 + logoGap + OV.stackHeight(items, o)) / 2;
+        const lb = top + logoSize * 0.72;
+        OV.lockup(ctx, d, x, lb, logoSize, 'left', colW, 'apimy');
+        OV.stack(ctx, items, x, lb + logoGap, o);
+      },
+    },
+    {
+      id: 'apimy-hero',
+      name: 'APIMY Hero',
+      desc: 'Large route, a big lockup and a one-line run summary.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const rw = W * 0.76, rh = H * 0.36, ry = H * 0.4 - rh / 2;
+        OV.drawRoute(ctx, d.route, { x: cx - rw / 2, y: ry, w: rw, h: rh }, { width: 13 * s * d.rw, markers: true });
+        const lb = ry + rh + 150 * s;
+        OV.lockup(ctx, d, cx, lb, 66 * s, 'center', W * 0.88, 'apimy');
+
+        const parts = [d.dist.value, d.pace.value, d.time.clock];
+        const sep = '  •  ';
+        const full = parts.join(sep);
+        const size = OV.fitSize(ctx, full, W - 120 * s, 50 * s, 800);
+        const y = lb + 130 * s + size * 0.72;
+        let x = cx - OV.measure(ctx, full, size, 800) / 2;
+        parts.forEach((p, i) => {
+          if (i) x += OV.text(ctx, sep, x, y, { size, weight: 800, align: 'left', color: ORANGE });
+          x += OV.text(ctx, p, x, y, { size, weight: 800, align: 'left' });
+        });
+      },
+    },
+    {
+      id: 'apimy-elevation',
+      name: 'APIMY Elevation',
+      desc: 'Lockup and stat row up top, route in the middle, elevation profile at the bottom.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const lb = H * 0.07 + 40 * s;
+        OV.lockup(ctx, d, cx, lb, 54 * s, 'center', W * 0.84, 'apimy');
+        const rowBottom = OV.row(ctx, [d.dist, d.pace, d.time], 40 * s, W - 80 * s, lb + 100 * s, {
+          labelSize: 28 * s, valueSize: 56 * s, dividers: true,
+        });
+
+        const ph = H * 0.17, py = H - ph - 60 * s;
+        OV.drawProfile(ctx, d.profile, { x: 0, y: py, w: W, h: ph }, { width: 5 * s });
+        const rtop = rowBottom + 90 * s, avail = py - 90 * s - rtop;
+        const rh = Math.max(0, Math.min(H * 0.32, avail));
+        OV.drawRoute(ctx, d.route, { x: cx - W * 0.33, y: rtop + (avail - rh) / 2, w: W * 0.66, h: rh }, { width: 12 * s * d.rw });
+      },
+    },
+    {
+      id: 'apimy-sticker',
+      name: 'APIMY Sticker',
+      desc: 'Full APIMY sticker logo top-left, big value-over-label stats, route bottom-right.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, x = 80 * s;
+        // Keep clear of the story UI at the top and bottom; tighter on shorter canvases.
+        const top = H * 0.12, bottom = H - H * 0.12;
+        const logoH = Math.min(320 * s, H * 0.2);
+        ctx.save();
+        ctx.shadowColor = 'transparent'; // the sticker carries its own drop shadow
+        // The 512px sticker image has 67px of transparent padding before its white
+        // contour; shift it left by that much so the contour lines up with the stats.
+        const logoPad = logoH * 67 / 512;
+        OV.drawLogo(ctx, 'apimysticker', { x: x - logoPad, y: top, w: W * 0.5, h: logoH }, 'left');
+        ctx.restore();
+
+        const vs = 96 * s, ls = 30 * s, gap = 56 * s;
+        const items = [
+          { value: d.dist.num, label: d.dist.unit },
+          { value: d.time.clock, label: d.time.label },
+          { value: d.pace.num, label: `${d.pace.label} ${d.pace.unit}` },
+        ];
+        let y = top + logoH + 80 * s;
+        const statsTop = y;
+        items.forEach((it, i) => {
+          if (i) y += gap;
+          y += vs * 0.74;
+          OV.text(ctx, it.value, x, y, { size: vs, weight: 800, align: 'left', maxWidth: W * 0.5 });
+          y += ls * 1.45;
+          OV.text(ctx, it.label.toUpperCase(), x, y, { size: ls, weight: 700, align: 'left', spacing: 4 * s, color: ORANGE });
+        });
+
+        // Route fills the lower right, from beside the second stat down to the bottom margin.
+        const ry = statsTop + (y - statsTop) * 0.45, avail = Math.max(0, bottom - ry);
+        const rh = Math.min(H * 0.26, avail);
+        OV.drawRoute(ctx, d.route, { x: W * 0.54, y: ry + (avail - rh) / 2, w: W * 0.38, h: rh }, { width: 11 * s * d.rw, markers: true });
+      },
+    },
+
     // ---------- White: minimalist, white only, light type and hairlines ----------
     {
       id: 'white-hairline',
@@ -1238,7 +1368,278 @@ window.OV = window.OV || {};
         });
       },
     },
+
+    // ---------- Nike Run Club inspired: heavy condensed numerals, volt, pace-coloured routes ----------
+    {
+      id: 'nike-summary',
+      name: 'Run Summary',
+      desc: 'Nike Run Club inspired: a giant distance, a stat grid and the route coloured by pace.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, x = 80 * s, cw = W - 160 * s;
+        let y = H * (short ? 0.07 : 0.1);
+        y = nikeHeading(ctx, d, x, y, cw, s);
+        const size = OV.fitSize(ctx, d.dist.num, cw, (short ? 300 : 400) * s, 800, 0, NIKE_F);
+        y += 40 * s + size * 0.74;
+        OV.text(ctx, d.dist.num, x - size * 0.03, y, { size, weight: 800, family: NIKE_F, align: 'left' });
+        y += 64 * s;
+        nikeLabel(ctx, d.dist.long, x, y, 36 * s);
+        const cells = nikeCells(d).slice(0, short ? 3 : 6);
+        y = nikeGrid(ctx, cells, x, y + 120 * s, cw, s, short ? 72 : 80);
+        const top = y + 80 * s, bottom = H * (short ? 0.93 : 0.9);
+        if (bottom - top > 140 * s) nikeRoute(ctx, d.route, { x, y: top, w: cw, h: bottom - top }, 12 * s * d.rw, 'center');
+      },
+    },
+    {
+      id: 'nike-pacemap',
+      name: 'Pace Map',
+      desc: 'Nike Run Club inspired: a big route shaded slow to fast, with a pace legend and run stats.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, x = 80 * s, cw = W - 160 * s;
+        const rTop = H * 0.08, rH = H * (short ? 0.42 : 0.46);
+        const paced = nikeRoute(ctx, d.route, { x, y: rTop, w: cw, h: rH }, 15 * s * d.rw, 'center', true);
+        let y = rTop + rH + 70 * s;
+        if (paced) paceLegend(ctx, x, y, Math.min(cw, 420 * s), s);
+        const size = OV.fitSize(ctx, d.dist.num, cw * 0.6, (short ? 200 : 260) * s, 800, 0, NIKE_F);
+        y += 80 * s + size * 0.74;
+        const w = OV.text(ctx, d.dist.num, x - size * 0.03, y, { size, weight: 800, family: NIKE_F, align: 'left' });
+        nikeLabel(ctx, d.dist.unit.toUpperCase(), x + w + 16 * s, y, 44 * s, VOLT);
+        nikeGrid(ctx, nikeCells(d).slice(0, 3), x, y + 110 * s, cw, s, short ? 64 : 72);
+      },
+    },
+    {
+      id: 'nike-splits',
+      name: 'Splits',
+      desc: 'Nike Run Club inspired: pace per split as bars, fastest split in volt.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, x = 80 * s, cw = W - 160 * s;
+        let y = H * (short ? 0.07 : 0.1);
+        const size = OV.fitSize(ctx, d.dist.num, cw * 0.55, (short ? 190 : 240) * s, 800, 0, NIKE_F);
+        y += size * 0.74;
+        OV.text(ctx, d.dist.num, x - size * 0.03, y, { size, weight: 800, family: NIKE_F, align: 'left' });
+        nikeLabel(ctx, d.dist.long, x, y + 56 * s, 32 * s);
+        OV.text(ctx, d.time.clock, x + cw, y - 150 * s, { size: 72 * s, weight: 800, family: NIKE_F, align: 'right' });
+        nikeLabel(ctx, d.time.label, x + cw, y - 108 * s, 26 * s, MUTED, 'right');
+        OV.text(ctx, d.pace.num, x + cw, y, { size: 72 * s, weight: 800, family: NIKE_F, align: 'right' });
+        nikeLabel(ctx, d.useSpeed ? `Avg. Speed ${d.pace.unit}` : `Avg. Pace ${d.pace.unit}`, x + cw, y + 42 * s, 26 * s, MUTED, 'right');
+
+        const rows = splitRows(d.splits, short ? 6 : 10);
+        if (!rows.length) return;
+        y += 150 * s;
+        const head = d.dist.unit === 'mi' ? 'MI' : 'KM';
+        nikeLabel(ctx, head, x, y, 26 * s);
+        nikeLabel(ctx, d.useSpeed ? 'SPEED' : 'PACE', x + 110 * s, y, 26 * s);
+        const avail = H * (short ? 0.94 : 0.9) - y - 30 * s;
+        const rowH = Math.min(96 * s, avail / rows.length);
+        const paces = rows.map((r) => r.paceSecs);
+        const fast = Math.min(...paces), slow = Math.max(...paces);
+        const bx = x + 110 * s, bw = cw - 110 * s;
+        rows.forEach((r, i) => {
+          const top = y + 24 * s + i * rowH, bh = rowH * 0.7, mid = top + bh / 2;
+          const f = slow > fast ? (slow - r.paceSecs) / (slow - fast) : 1;
+          const best = r.paceSecs === fast;
+          OV.text(ctx, r.label, x, mid + 15 * s, { size: 42 * s, weight: 800, family: NIKE_F, align: 'left' });
+          noShadow(ctx, () => {
+            ctx.fillStyle = best ? VOLT : 'rgba(255,255,255,0.92)';
+            OV.roundRect(ctx, bx, top, bw * (0.42 + 0.58 * f), bh, 6 * s);
+            ctx.fill();
+            const v = d.useSpeed ? (3600 / r.paceSecs).toFixed(1) : OV.fmtPace(r.paceSecs);
+            OV.text(ctx, v, bx + 20 * s, mid + 15 * s, { size: 42 * s, weight: 800, family: NIKE_F, align: 'left', color: '#111111' });
+          });
+        });
+        // Few splits leave room below the table: the route fills it.
+        const top = y + 24 * s + rows.length * rowH + 90 * s, bottom = H * (short ? 0.94 : 0.9);
+        if (bottom - top > 220 * s) nikeRoute(ctx, d.route, { x, y: top, w: cw, h: bottom - top }, 12 * s * d.rw, 'center', true);
+      },
+    },
+    {
+      id: 'nike-sticker',
+      name: 'Volt Sticker',
+      desc: 'Nike Run Club inspired: a volt card with black type, route above it.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5;
+        const cw = W * 0.74, cx0 = (W - cw) / 2, pad = 56 * s;
+        const ch = (short ? 600 : 680) * s, cy0 = H * (short ? 0.92 : 0.84) - ch;
+        const rTop = H * (short ? 0.06 : 0.1), rH = cy0 - 70 * s - rTop;
+        if (rH > 120 * s) OV.drawRoute(ctx, d.route, { x: cx0, y: rTop, w: cw, h: rH }, { width: 13 * s * d.rw, color: VOLT });
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 40 * s;
+        ctx.shadowOffsetY = 12 * s;
+        ctx.fillStyle = VOLT;
+        OV.roundRect(ctx, cx0, cy0, cw, ch, 36 * s);
+        ctx.fill();
+        ctx.restore();
+        noShadow(ctx, () => {
+          const x = cx0 + pad, iw = cw - 2 * pad, ink = '#111111';
+          let y = cy0 + pad + 30 * s;
+          OV.text(ctx, d.name, x, y, { size: 34 * s, weight: 600, family: OV.INTER, align: 'left', color: ink, maxWidth: iw });
+          const size = OV.fitSize(ctx, d.dist.num, iw, 250 * s, 800, 0, NIKE_F);
+          y += 30 * s + size * 0.76;
+          OV.text(ctx, d.dist.num, x - size * 0.03, y, { size, weight: 800, family: NIKE_F, align: 'left', color: ink });
+          y += 54 * s;
+          nikeLabel(ctx, d.dist.long, x, y, 30 * s, ink);
+          y += 50 * s;
+          ctx.fillStyle = 'rgba(0,0,0,0.18)';
+          ctx.fillRect(x, y, iw, 2 * s);
+          nikeGrid(ctx, nikeCells(d).slice(0, 3), x, y + 100 * s, iw, s, 60, ink, 'rgba(0,0,0,0.6)');
+        });
+      },
+    },
+    {
+      id: 'nike-stack',
+      name: 'Big Stack',
+      desc: 'Nike Run Club inspired: distance, time and pace stacked huge, labels in volt.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, short = H / W < 1.5, x = 80 * s, cw = W - 160 * s;
+        const lines = [
+          { v: d.dist.num, l: d.dist.unit.toUpperCase() },
+          { v: d.time.clock, l: d.time.label },
+          { v: d.pace.num, l: d.useSpeed ? d.pace.unit : `${d.pace.label} ${d.pace.unit}` },
+        ];
+        const rH = H * (short ? 0.26 : 0.3), rTop = H * (short ? 0.06 : 0.08);
+        nikeRoute(ctx, d.route, { x: W * 0.5, y: rTop, w: W * 0.5 - x, h: rH }, 11 * s * d.rw, 'right');
+        const size = Math.min(...lines.map((ln) => OV.fitSize(ctx, ln.v, cw * 0.72, (short ? 200 : 250) * s, 800, 0, NIKE_F)));
+        const step = size * 0.92;
+        let y = H * (short ? 0.93 : 0.88) - step * (lines.length - 1);
+        OV.text(ctx, d.name, x, y - size * 0.78 - 46 * s, { size: 36 * s, weight: 600, family: OV.INTER, align: 'left', maxWidth: cw });
+        for (const ln of lines) {
+          const w = OV.text(ctx, ln.v, x - size * 0.03, y, { size, weight: 800, family: NIKE_F, align: 'left' });
+          nikeLabel(ctx, ln.l, x + w + 18 * s, y - size * 0.06, 34 * s, VOLT);
+          y += step;
+        }
+      },
+    },
   ];
+
+  // ---------- Nike Run Club inspired helpers ----------
+
+  const VOLT = '#D7FF00';
+  const MUTED = 'rgba(255,255,255,0.62)';
+  const NIKE_F = OV.CONDENSED; // Barlow Condensed 800 for the heavy numerals
+  // Route pace colours, slowest to fastest.
+  const PACE_STOPS = ['#FF3B30', '#FF9500', '#D7FF00'];
+
+  // Small caps label (unit names, stat titles).
+  function nikeLabel(ctx, str, x, y, size, color = MUTED, align = 'left') {
+    return OV.text(ctx, String(str).toUpperCase(), x, y, { size, weight: 600, family: OV.INTER, align, color, spacing: size * 0.08 });
+  }
+
+  // Run name and date; returns the y below them.
+  function nikeHeading(ctx, d, x, y, w, s) {
+    OV.text(ctx, d.name, x, y + 40 * s, { size: 42 * s, weight: 600, family: OV.INTER, align: 'left', maxWidth: w });
+    if (d.date) OV.text(ctx, d.date, x, y + 92 * s, { size: 30 * s, weight: 400, family: OV.INTER, align: 'left', color: MUTED });
+    return y + 100 * s;
+  }
+
+  // Stat cells: pace and time first, then whatever else the file has.
+  function nikeCells(d) {
+    return [
+      { v: d.pace.num, l: d.useSpeed ? `Avg. Speed` : 'Avg. Pace' },
+      { v: d.time.clock, l: 'Time' },
+      d.calories ? { v: String(parseInt(d.calories.value, 10)), l: 'Calories' } : { v: d.elev.num, l: `Elevation (${d.elev.unit || 'm'})` },
+      d.hr && { v: d.hr.num, l: 'Heart Rate' },
+      d.cadence && { v: d.cadence.num, l: 'Cadence' },
+      d.calories && { v: d.elev.num, l: `Elevation (${d.elev.unit || 'm'})` },
+      d.best && { v: d.best.num, l: d.best.label },
+    ].filter(Boolean);
+  }
+
+  // Three columns of value-over-label cells; returns the y below the last row.
+  function nikeGrid(ctx, cells, x, y, w, s, vs, color = '#FFFFFF', labelColor = MUTED) {
+    const colW = w / 3;
+    let bottom = y;
+    cells.forEach((c, i) => {
+      const cx = x + colW * (i % 3), cy = y + Math.floor(i / 3) * (vs + 90) * s;
+      OV.text(ctx, c.v, cx, cy, { size: vs * s, weight: 800, family: NIKE_F, align: 'left', color, maxWidth: colW - 20 * s });
+      nikeLabel(ctx, c.l, cx, cy + 40 * s, 24 * s, labelColor);
+      bottom = cy + 40 * s;
+    });
+    return bottom;
+  }
+
+  // Pace per point (seconds per metre, smoothed), from GPS time; null without times.
+  function routePaces(pts) {
+    const step = Math.max(1, Math.floor(pts.length / 120));
+    const out = new Array(pts.length).fill(null);
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[Math.max(0, i - step)], b = pts[Math.min(pts.length - 1, i + step)];
+      if (a.time == null || b.time == null) continue;
+      let dist = 0;
+      for (let j = Math.max(0, i - step); j < Math.min(pts.length - 1, i + step); j++) dist += meters(pts[j], pts[j + 1]);
+      const dt = (b.time - a.time) / 1000;
+      if (dist > 1 && dt > 0) out[i] = dt / dist;
+    }
+    return out.filter((v) => v != null).length > pts.length / 2 ? out : null;
+  }
+
+  const mix = (a, b, f) => rgbOf(a).map((v, i) => Math.round(v + (rgbOf(b)[i] - v) * f));
+  function paceColor(f) {
+    const k = Math.max(0, Math.min(1, f)) * (PACE_STOPS.length - 1), i = Math.min(Math.floor(k), PACE_STOPS.length - 2);
+    return `rgb(${mix(PACE_STOPS[i], PACE_STOPS[i + 1], k - i).join(',')})`;
+  }
+
+  // The route in short pieces, each coloured by its pace (red slow, volt fast), over a
+  // dark underlay that carries the shadow. Plain volt when the file has no times.
+  // Returns whether it was pace-coloured.
+  function nikeRoute(ctx, route, box, width, align, markers) {
+    if (!route || route.length < 2) return false;
+    const view = OV.routeView(route, box, align);
+    const paces = routePaces(route);
+    ctx.save();
+    if (!paces) {
+      OV.drawRoute(ctx, route, box, { width, color: VOLT, view, align, markers });
+      ctx.restore();
+      return false;
+    }
+    const sorted = paces.filter((v) => v != null).sort((a, b) => a - b);
+    const fast = sorted[Math.floor(sorted.length * 0.1)], slow = sorted[Math.floor(sorted.length * 0.9)];
+    OV.drawRoute(ctx, route, box, { width: width * 1.5, color: 'rgba(0,0,0,0.35)', view, align });
+    ctx.shadowColor = 'transparent';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = width;
+    const N = Math.min(90, route.length - 1);
+    for (let b = 0; b < N; b++) {
+      const i0 = Math.floor((b * (route.length - 1)) / N), i1 = Math.floor(((b + 1) * (route.length - 1)) / N);
+      const seg = route.slice(i0, i1 + 1);
+      const ps = paces.slice(i0, i1 + 1).filter((v) => v != null);
+      const p = ps.length ? ps.reduce((a, v) => a + v, 0) / ps.length : (fast + slow) / 2;
+      const pts = OV.fitRoute(seg, box, align, view);
+      ctx.strokeStyle = paceColor(slow > fast ? (slow - p) / (slow - fast) : 1);
+      ctx.beginPath();
+      pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+      ctx.stroke();
+    }
+    if (markers) {
+      const all = OV.fitRoute(route, box, align, view), a = all[0], e = all[all.length - 1];
+      for (const [q, c] of [[a, '#FFFFFF'], [e, '#111111']]) {
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, width * 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = c;
+        ctx.fill();
+        ctx.lineWidth = width * 0.4;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    return true;
+  }
+
+  // "Slower ▬▬▬ Faster" gradient key for the pace colours.
+  function paceLegend(ctx, x, y, w, s) {
+    const lw = OV.measure(ctx, 'SLOWER', 22 * s, 600, 22 * s * 0.08, OV.INTER) + 16 * s;
+    const bx = x + lw, bw = w - 2 * lw, bh = 10 * s;
+    nikeLabel(ctx, 'Slower', x, y + 8 * s, 22 * s);
+    noShadow(ctx, () => {
+      const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      PACE_STOPS.forEach((c, i) => g.addColorStop(i / (PACE_STOPS.length - 1), c));
+      ctx.fillStyle = g;
+      OV.roundRect(ctx, bx, y - bh / 2, bw, bh, bh / 2);
+      ctx.fill();
+    });
+    nikeLabel(ctx, 'Faster', bx + bw + 16 * s, y + 8 * s, 22 * s);
+  }
 
   // ---------- Apple / Garmin inspired helpers ----------
 
@@ -2097,18 +2498,20 @@ window.OV = window.OV || {};
   // north-south route grows tall instead of shrinking to fit a short, wide strip.
   // On shorter canvases (square/portrait) the stats are a bit tighter and the logo
   // sits near the bottom edge, leaving more room for the route.
-  function classicLayout(ctx, W, H, d, items, footer) {
+  // `o.color` tints the stats and route (default: white stats, orange route).
+  function classicLayout(ctx, W, H, d, items, footer, o = {}) {
     const s = W / 1080, cx = W / 2;
     const short = H / W < 1.5;
     const k = short ? 0.8 : 1;
     const y = OV.stack(ctx, items, cx, H * 0.09, {
       labelSize: 36 * s * k, valueSize: 84 * s * k, gap: 90 * s * k, maxWidth: W * 0.86,
+      labelColor: o.color, valueColor: o.color,
     });
     const top = y + 90 * s * k;
     const footerY = short ? H - 110 * s : H * 0.76;
     const minH = Math.min(170 * s, H * 0.11);
     const rh = Math.max(minH, footerY - 140 * s * k - top);
-    OV.drawRoute(ctx, d.route, { x: cx - W * 0.35, y: top, w: W * 0.7, h: rh }, { width: 11 * s * d.rw });
+    OV.drawRoute(ctx, d.route, { x: cx - W * 0.35, y: top, w: W * 0.7, h: rh }, { width: 11 * s * d.rw, color: o.color });
     footer(cx, top + rh + 140 * s * k, s);
   }
 
@@ -2117,18 +2520,28 @@ window.OV = window.OV || {};
   // Template tabs, picked by the start of the template id (see PREFIX_GROUP);
   // everything else is in STRAVA.
   OV.groups = [
-    { id: 'strava', name: 'STRAVA' },
-    { id: 'clubs', name: 'CLUBS' },
-    { id: 'white', name: 'WHITE' },
-    { id: 'map', name: 'MAP' },
-    { id: 'apple', name: 'APPLE' },
-    { id: 'garmin', name: 'GARMIN' },
-    { id: 'other', name: 'OTHERS' },
+    { id: 'strava', name: 'Strava' },
+    { id: 'clubs', name: 'Clubs' },
+    { id: 'white', name: 'White' },
+    { id: 'map', name: 'Map' },
+    { id: 'apple', name: 'Apple' },
+    { id: 'garmin', name: 'Garmin' },
+    { id: 'nike', name: 'Nike' },
+    { id: 'other', name: 'Others' },
   ];
-  // Template id prefix -> tab. The club layouts (TTRC, KL Bisiklista, APIMYCC) share CLUBS.
-  const PREFIX_GROUP = { ttrc: 'clubs', kl: 'clubs', apimycc: 'clubs', white: 'white', map: 'map', apple: 'apple', garmin: 'garmin', course: 'other' };
+  // Clubs share the CLUBS tab; each gets a sub-filter chip, keyed by id prefix.
+  OV.clubs = [
+    { id: 'ttrc', name: 'TTRC' },
+    { id: 'kl', name: 'KL Bisiklista' },
+    { id: 'apimycc', name: 'APIMYCC' },
+    { id: 'apimy', name: 'APIMY' },
+  ];
+  // Template id prefix -> tab.
+  const PREFIX_GROUP = { white: 'white', map: 'map', apple: 'apple', garmin: 'garmin', nike: 'nike', course: 'other' };
+  for (const c of OV.clubs) PREFIX_GROUP[c.id] = 'clubs';
   for (const t of templates) {
     const prefix = (t.id.match(/^([a-z]+)-/) || [])[1]; // "ttrc-side" -> ttrc; "map" has none
     t.group = PREFIX_GROUP[prefix] || 'strava';
+    if (t.group === 'clubs') t.club = prefix;
   }
 })(window.OV);

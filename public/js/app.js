@@ -11,6 +11,7 @@
     isDemo: true,
     selected: OV.templates[0].id,
     group: 'strava',
+    club: 'all', // sub-filter inside the CLUBS tab
     bg: null,
     thumbs: new Map(),
     files: new Map(), // template id -> ready-to-share PNG File
@@ -47,7 +48,10 @@
   }
 
   const tplById = (id) => OV.templates.find((t) => t.id === id) || OV.templates[0];
-  const groupTemplates = () => OV.templates.filter((t) => t.group === state.group);
+  // In the active tab, and in the chosen club when the CLUBS tab is open.
+  const inGroup = (t) => t.group === state.group &&
+    (state.group !== 'clubs' || state.club === 'all' || t.club === state.club);
+  const groupTemplates = () => OV.templates.filter(inGroup);
 
   // ---------- group tabs ----------
 
@@ -65,28 +69,69 @@
       btn.addEventListener('click', () => setGroup(g.id));
       tabs.appendChild(btn);
     }
+    buildClubChips();
     try {
       const saved = localStorage.getItem('ov-group');
-      if (OV.groups.some((g) => g.id === saved)) state.group = saved;
+      const club = localStorage.getItem('ov-club');
+      if (saved === 'apimy') { state.group = 'clubs'; state.club = 'apimy'; } // old APIMY tab
+      else if (OV.groups.some((g) => g.id === saved)) state.group = saved;
+      if (OV.clubs.some((c) => c.id === club)) state.club = club;
     } catch (e) { /* storage unavailable: keep default tab */ }
     applyGroup();
   }
 
-  // Shows only the active group's thumbnails; keeps the selection inside the group.
+  // "All" plus one chip per club, each with a faint template count.
+  function buildClubChips() {
+    const row = $('subtabs');
+    const clubTemplates = OV.templates.filter((t) => t.group === 'clubs');
+    const chips = [{ id: 'all', name: 'All' }, ...OV.clubs];
+    for (const c of chips) {
+      const count = clubTemplates.filter((t) => c.id === 'all' || t.club === c.id).length;
+      if (!count) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'subtab';
+      btn.setAttribute('role', 'tab');
+      btn.dataset.club = c.id;
+      btn.textContent = c.name;
+      const n = document.createElement('span');
+      n.className = 'subtab-count';
+      n.textContent = count;
+      btn.appendChild(n);
+      btn.addEventListener('click', () => setClub(c.id));
+      row.appendChild(btn);
+    }
+  }
+
+  // Shows only the active group's (and club's) thumbnails; keeps the selection inside it.
   function applyGroup() {
     for (const el of $('tabs').children) {
       const on = el.dataset.group === state.group;
       el.classList.toggle('active', on);
       el.setAttribute('aria-selected', String(on));
     }
-    for (const [id, el] of state.thumbs) el.hidden = tplById(id).group !== state.group;
-    if (tplById(state.selected).group !== state.group) state.selected = groupTemplates()[0].id;
+    $('subtabs').hidden = state.group !== 'clubs';
+    for (const el of $('subtabs').children) {
+      const on = el.dataset.club === state.club;
+      el.classList.toggle('active', on);
+      el.setAttribute('aria-selected', String(on));
+    }
+    for (const [id, el] of state.thumbs) el.hidden = !inGroup(tplById(id));
+    if (!inGroup(tplById(state.selected))) state.selected = groupTemplates()[0].id;
     for (const [tid, el] of state.thumbs) el.classList.toggle('active', tid === state.selected);
   }
 
   function setGroup(id) {
     state.group = id;
     try { localStorage.setItem('ov-group', id); } catch (e) { /* not persisted */ }
+    applyGroup();
+    renderAll();
+    centerSelected(false);
+  }
+
+  function setClub(id) {
+    state.club = id;
+    try { localStorage.setItem('ov-club', id); } catch (e) { /* not persisted */ }
     applyGroup();
     renderAll();
     centerSelected(false);
@@ -139,6 +184,8 @@
     centerCard(state.thumbs.get(state.selected), smooth);
     const tab = $('tabs').querySelector('.tab.active');
     if (tab) centerIn($('tabs'), tab, smooth);
+    const chip = $('subtabs').querySelector('.subtab.active');
+    if (chip && !$('subtabs').hidden) centerIn($('subtabs'), chip, smooth);
     shapeCarousel();
   };
 
@@ -505,7 +552,7 @@
   async function loadFonts() {
     if (!document.fonts) return;
     const loads = [500, 600, 700, 800, 900].map((w) => document.fonts.load(`${w} 40px "Montserrat"`))
-      .concat([500, 600].map((w) => document.fonts.load(`${w} 40px "Barlow Condensed"`)))
+      .concat([500, 600, 800].map((w) => document.fonts.load(`${w} 40px "Barlow Condensed"`)))
       .concat([500, 600].map((w) => document.fonts.load(`${w} 40px "Barlow"`)))
       .concat([300, 400, 600, 800].map((w) => document.fonts.load(`${w} 40px "Inter"`)))
       .concat([document.fonts.load('500 40px "IBM Plex Mono"')])

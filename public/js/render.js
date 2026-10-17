@@ -69,7 +69,7 @@ window.OV = window.OV || {};
         spacing: o.labelSpacing, alpha: o.labelAlpha,
       });
       y += vs * 1.05;
-      text(ctx, it.value, x, y, { size: vs, weight: o.valueWeight || 800, align, maxWidth: o.maxWidth });
+      text(ctx, it.value, x, y, { size: vs, weight: o.valueWeight || 800, align, maxWidth: o.maxWidth, color: o.valueColor });
     });
     return y;
   }
@@ -275,11 +275,18 @@ window.OV = window.OV || {};
   // Club marks that sit beside the wordmark. `scale` is relative to the wordmark's
   // ink height: the striped TTRC logo reads lighter than solid type, so it is 20% taller.
   const MARKS = {
-    ttrc: { scale: 1.2, aspect: () => LOGO_W / 100, draw: (ctx, x, top, h) => drawClubLogo(ctx, x, top, h) },
+    ttrc: { scale: 1.2, aspect: () => LOGO_W / 100, draw: (ctx, x, top, h, color) => drawClubLogo(ctx, x, top, h, color) },
     apimycc: {
       scale: 1,
       aspect: () => (logos.apimycc ? logos.apimycc.width / logos.apimycc.height : 0),
       draw: (ctx, x, top, h) => ctx.drawImage(logos.apimycc, x, top, h * MARKS.apimycc.aspect(), h),
+    },
+    // APIMY: full-colour lettering with the "Active Pinoys in Malaysia" tagline under
+    // it. The APIMY letters (top ~70% of the image) come out ~1.25x the wordmark.
+    apimy: {
+      scale: 1.8,
+      aspect: () => (logos.apimy ? logos.apimy.width / logos.apimy.height : 0),
+      draw: (ctx, x, top, h) => ctx.drawImage(logos.apimy, x, top, h * MARKS.apimy.aspect(), h),
     },
     // KL BISIKLISTA: the chain-link K/L is taller than the letters, so the mark is
     // sized and centered by its letter band (BISI / ISTA), which matches the
@@ -308,7 +315,8 @@ window.OV = window.OV || {};
   // "STRAVA | <club>" on one line. The club mark is sized to the wordmark's ink
   // height (top of the letters to the bottom of their overshoot) and centered on
   // the same midline, so both share a top and bottom edge; the divider matches.
-  function lockup(ctx, d, x, baseline, size, align = 'center', maxWidth = Infinity, markName = 'ttrc') {
+  // `color` tints the wordmark, divider and (where supported) the club mark; default white.
+  function lockup(ctx, d, x, baseline, size, align = 'center', maxWidth = Infinity, markName = 'ttrc', color = WHITE) {
     const mark = MARKS[markName];
     const wm = d.wordmark;
     const mt = wordmarkMetrics(ctx, d, size);
@@ -321,25 +329,26 @@ window.OV = window.OV || {};
     const markH = inkH * mark.scale;
     const markW = markH * mark.aspect();
     const total = wmW + (wm && markW ? gap * 2 + divW : 0) + markW;
-    if (total > maxWidth) return lockup(ctx, d, x, baseline, (size * maxWidth) / total, align, Infinity, markName);
+    if (total > maxWidth) return lockup(ctx, d, x, baseline, (size * maxWidth) / total, align, Infinity, markName, color);
 
     const x0 = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
     withLogoShadow(ctx, inkH, () => {
       let sx = x0;
       if (wm) {
-        drawWordmarkAt(ctx, d, sx, baseline, size);
+        drawWordmarkAt(ctx, d, sx, baseline, size, color);
         sx += wmW;
         if (markW) {
           sx += gap;
           ctx.save();
-          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.fillStyle = color;
+          ctx.globalAlpha *= 0.7;
           const divH = Math.min(markH, inkH * 1.3);
           ctx.fillRect(sx, mid - divH / 2, divW, divH);
           ctx.restore();
           sx += divW + gap;
         }
       }
-      if (markW) mark.draw(ctx, sx, mid - markH * (mark.center ?? 0.5), markH);
+      if (markW) mark.draw(ctx, sx, mid - markH * (mark.center ?? 0.5), markH, color);
     });
     return { width: total, capH: ascent };
   }

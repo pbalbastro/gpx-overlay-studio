@@ -297,6 +297,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
   background: var(--panel);
   color: var(--muted);
   font-weight: 700;
+  text-transform: uppercase;
   letter-spacing: 0.04em;
   cursor: pointer;
 }
@@ -308,6 +309,36 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
   border-radius: 99px;
   background: rgba(255, 255, 255, 0.12);
 }
+/* Club sub-filter under the CLUBS tab: quieter than the tabs, no outline; the
+   active chip gets orange text on a dim orange fill. */
+.subtabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: -4px 0 14px;
+}
+.subtabs[hidden] { display: none; }
+.subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.subtab:hover { color: var(--text); }
+.subtab.active { background: var(--orange-dim); color: var(--orange); }
+.subtab:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.subtab-count { font-size: 11px; opacity: 0.6; }
 .thumb-wrap { display: flex; flex-direction: column; gap: 8px; }
 .thumb-wrap[hidden] { display: none; }
 .grid {
@@ -461,9 +492,13 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
   #copyPng:not([hidden]) { display: block; }
   .templates { display: flex; flex-direction: column; }
   .tabs,
+  .subtabs,
   .grid { scrollbar-width: none; }
   .tabs::-webkit-scrollbar,
+  .subtabs::-webkit-scrollbar,
   .grid::-webkit-scrollbar { display: none; }
+  .subtabs { position: relative; flex-wrap: nowrap; overflow-x: auto; margin: -2px -16px 8px; padding: 0 16px; }
+  .subtab { flex: 0 0 auto; }
   .tabs { position: relative; flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 8px; padding: 0 16px; }
   .tab { flex: 0 0 auto; padding: 6px 12px; font-size: 13px; }
   .grid {

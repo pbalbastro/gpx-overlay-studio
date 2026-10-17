@@ -118,6 +118,15 @@ button, input, select { font: inherit; color: inherit; }
 }
 .drop svg { color: var(--orange); }
 .drop strong { color: var(--text); font-size: 15px; }
+.drop .formats { display: flex; gap: 6px; margin-top: 4px; }
+.drop .formats code {
+  padding: 4px 7px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font: 600 11px/1 "IBM Plex Mono", monospace;
+  letter-spacing: 0.04em;
+}
 .drop:hover, .drop.over { border-color: var(--orange); background: var(--orange-dim); }
 
 .link {
@@ -177,14 +186,6 @@ button, input, select { font: inherit; color: inherit; }
 .controls input[type="text"] { margin-bottom: 10px; }
 .controls label.check { flex-direction: row; align-items: center; gap: 8px; }
 input[type="checkbox"], input[type="range"] { accent-color: var(--orange); }
-.file-btn {
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px;
-  cursor: pointer;
-}
-.file-btn:hover { border-color: var(--orange); }
 .hint { color: var(--muted); font-size: 12px; margin: 0; }
 
 /* ---------- stage ---------- */

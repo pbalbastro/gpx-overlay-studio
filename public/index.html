@@ -12,7 +12,7 @@
 <body>
   <header class="top">
     <div class="brand"><span class="dot"></span><span>GPX Overlay<span class="brand-tail"> Studio</span></span></div>
-    <p>Upload a GPX file and export transparent PNG stat overlays for your photos and stories.</p>
+    <p>Upload a GPX or FIT file and export transparent PNG stat overlays for your photos and stories.</p>
     <!-- Phones only: upload and settings live here; settings open as a bottom sheet. -->
     <div class="top-actions">
       <button type="button" class="top-btn" id="howtoBtn" aria-label="How to use" aria-controls="howto" aria-expanded="false">
@@ -20,7 +20,7 @@
       </button>
       <button type="button" class="top-btn" id="uploadBtn">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7l5-5zm-7 14h14v4H5v-4z"/></svg>
-        GPX
+        Upload
       </button>
       <button type="button" class="top-btn" id="settingsBtn" aria-label="Settings" aria-controls="panel" aria-expanded="false">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.47.47 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></svg>
@@ -49,13 +49,14 @@
       </section>
 
       <label class="drop" id="drop">
-        <!-- iOS doesn't know the .gpx type, so ".gpx" alone greys the files out; octet-stream keeps
+        <!-- iOS doesn't know the .gpx/.fit types, so those alone grey the files out; octet-stream keeps
              them selectable, and having no image/video types makes iOS open Files directly
              instead of offering Photo Library / Take Photo. -->
-        <input type="file" id="gpxInput" accept=".gpx,application/gpx+xml,application/octet-stream" hidden />
+        <input type="file" id="gpxInput" accept=".gpx,.fit,application/gpx+xml,application/octet-stream" hidden />
         <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7l5-5zm-7 14h14v4H5v-4z"/></svg>
-        <strong>Drop a GPX file</strong>
+        <strong>Drop a GPX or FIT file</strong>
         <span>or click to browse</span>
+        <span class="formats"><code>.gpx</code><code>.fit</code></span>
       </label>
       <button type="button" class="link" id="demo">Use demo activity</button>
       <p class="error" id="error" role="alert"></p>
@@ -86,14 +87,6 @@
         <label>Route thickness
           <input type="range" id="routeWidth" min="0.5" max="2" step="0.025" value="0.875" />
         </label>
-
-        <h3>Preview photo</h3>
-        <label class="file-btn">Choose photo
-          <input type="file" id="bgInput" accept="image/*" hidden />
-        </label>
-        <button type="button" class="link" id="clearBg" hidden>Remove photo</button>
-        <label class="check"><input type="checkbox" id="includeBg" /> Include photo in export</label>
-        <p class="hint">Without it, PNGs export with a transparent background.</p>
       </div>
     </aside>
 
@@ -123,8 +116,8 @@
             How to use
           </p>
           <ol>
-            <li><b>Get your GPX.</b> Strava: open your activity on strava.com → <b>⋯</b> menu → <b>Export GPX</b>. Garmin: open the activity on Garmin Connect → <b>⚙</b> → <b>Export to GPX</b>. On a phone, use the website (not the app) and save the file to Files.</li>
-            <li><b>Upload it.</b> Tap <b>GPX</b> at the top, or drop the file into the upload box.</li>
+            <li><b>Get your file.</b> Strava: open your activity on strava.com → <b>⋯</b> menu → <b>Export GPX</b>, or <b>Export Original</b> for the .fit from your watch. Garmin: open the activity on Garmin Connect → <b>⚙</b> → <b>Export Original</b> (unzip it for the .fit) or <b>Export to GPX</b>. On a phone, use the website (not the app) and save the file to Files.</li>
+            <li><b>Upload it.</b> Tap <b>Upload</b> at the top, or drop the file into the upload box.</li>
             <li><b>Pick a template.</b> Switch tabs and swipe or click through the designs.</li>
             <li><b>Save &amp; share.</b> Save the PNG (or <b>Copy</b> it), then add it over your photo in Instagram Stories. The background stays transparent.</li>
           </ol>
@@ -138,6 +131,7 @@
 
   <script src="js/logos.js"></script>
   <script src="js/gpx.js"></script>
+  <script src="js/fit.js"></script>
   <script src="js/demo.js"></script>
   <script src="js/render.js"></script>
   <script src="js/map.js"></script>

@@ -12,7 +12,6 @@
     selected: OV.templates[0].id,
     group: 'strava',
     club: 'all', // sub-filter inside the CLUBS tab
-    bg: null,
     thumbs: new Map(),
     files: new Map(), // template id -> ready-to-share PNG File
   };
@@ -26,16 +25,14 @@
       location: state.location, // looked up from the start point (lookupLocation)
       shadow: $('shadow').checked,
       routeWidth: parseFloat($('routeWidth').value),
-      includeBg: $('includeBg').checked,
     };
   }
 
-  function paint(canvas, tpl, W, H, d, opts, bg) {
+  function paint(canvas, tpl, W, H, d, opts) {
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, W, H);
-    if (bg) OV.drawCover(ctx, bg, W, H);
     ctx.save();
     if (opts.shadow) {
       const s = W / 1080;
@@ -275,7 +272,7 @@
     const [W, H] = SIZES[opts.size];
     const tpl = tplById(state.selected);
     // Phones have no large preview: the carousel's middle card is the preview.
-    if (!isPhoneLayout()) paint($('preview'), tpl, W, H, currentData(opts), opts, state.bg);
+    if (!isPhoneLayout()) paint($('preview'), tpl, W, H, currentData(opts), opts);
     $('tplName').textContent = tpl.name;
     $('previewBox').style.aspectRatio = `${W} / ${H}`;
     invalidateFiles();
@@ -291,7 +288,7 @@
     for (const t of groupTemplates()) {
       const el = state.thumbs.get(t.id);
       el.querySelector('.thumb-canvas').style.aspectRatio = `${W} / ${H}`;
-      paint(el.querySelector('canvas'), t, tw, Math.round((tw * H) / W), d, opts, state.bg);
+      paint(el.querySelector('canvas'), t, tw, Math.round((tw * H) / W), d, opts);
     }
     fitCards(); // the canvas size may have changed
     renderPreview();
@@ -302,6 +299,7 @@
     const pts = state.stats.points.length.toLocaleString();
     $('info').innerHTML = `
       ${state.isDemo ? '<span class="badge">Demo activity</span>' : ''}
+      ${state.source === 'fit' ? `<span class="badge">${escapeHtml(['FIT', state.device].filter(Boolean).join(' \u00B7 '))}</span>` : ''}
       <strong>${escapeHtml(d.name)}</strong>
       <span>${escapeHtml(d.date || 'No date in file')}</span>
       <dl>
@@ -310,7 +308,8 @@
         <div><dt>${d.time.label}</dt><dd>${d.time.value}</dd></div>
         <div><dt>${d.elev.label}</dt><dd>${d.elev.value}</dd></div>
       </dl>
-      <small>${state.source !== 'strava' ? `${pts} track points`
+      <small>${state.source === 'fit' ? (state.stats.points.length ? `${pts} records \u00B7 device totals` : 'Device totals \u00B7 no GPS route (indoor)')
+        : state.source !== 'strava' ? `${pts} track points`
         : state.stats.points.length ? `From Strava · ${pts} GPS points` : 'From Strava · no GPS route (indoor/manual)'}</small>`;
   }
 
@@ -323,7 +322,7 @@
     setActivity(meta, OV.computeStats(meta.points), isDemo ? 'demo' : 'gpx');
   }
 
-  // Shared by GPX uploads, the demo and Strava. `source` is 'demo' | 'gpx' | 'strava'.
+  // Shared by GPX/FIT uploads, the demo and Strava. `source` is 'demo' | 'gpx' | 'fit' | 'strava'.
   function setActivity(meta, stats, source, extras = {}) {
     state.meta = meta;
     state.stats = stats;
@@ -333,6 +332,7 @@
     $('title').value = '';
     $('title').placeholder = meta.name || 'Auto (e.g. Morning Run)';
     state.calories = extras.calories || null;
+    state.device = extras.device || null; // FIT: the recording device, for the info card
     state.location = null;
     renderAll();
     lookupLocation(stats.points);
@@ -370,50 +370,47 @@
     err.textContent = '';
     const reader = new FileReader();
     reader.onload = () => {
-      // The picker accepts any file (see index.html), so check it really is GPX.
-      if (!/<gpx[\s>]/i.test(reader.result.slice(0, 4096))) {
-        err.textContent = `"${file.name}" isn't a GPX file. Please choose a .gpx file.`;
-        return;
-      }
+      // The picker accepts any file (see index.html), so tell the format from the content.
+      const bytes = new Uint8Array(reader.result);
       try {
-        loadGPXText(reader.result, false);
+        if (OV.isFit(bytes)) {
+          const a = OV.fitActivity(reader.result);
+          setActivity(a.meta, a.stats, 'fit', { calories: a.calories, device: a.device });
+        } else if (bytes[0] === 0x50 && bytes[1] === 0x4b) { // "PK": a zip, e.g. Garmin's Export Original
+          err.textContent = `"${file.name}" is a zip. Unzip it first, then upload the .fit file inside.`;
+          return;
+        } else {
+          const text = new TextDecoder().decode(bytes);
+          if (!/<gpx[\s>]/i.test(text.slice(0, 4096))) {
+            err.textContent = `"${file.name}" isn't a GPX or FIT file. Please choose a .gpx or .fit file.`;
+            return;
+          }
+          loadGPXText(text, false);
+        }
         showStage();
       } catch (e) {
         err.textContent = e.message;
       }
     };
     reader.onerror = () => { err.textContent = 'Could not read that file.'; };
-    reader.readAsText(file);
-  }
-
-  function handleBg(file) {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      state.bg = img;
-      $('clearBg').hidden = false;
-      renderAll();
-    };
-    img.src = url;
+    reader.readAsArrayBuffer(file);
   }
 
   function slug(s) {
     return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'activity';
   }
 
-  // Renders the export-size PNG (transparent unless the photo is included).
+  // Renders the export-size PNG on a transparent background.
   async function renderFile(tpl) {
     const opts = readOpts();
     const [W, H] = SIZES[opts.size];
     const canvas = document.createElement('canvas');
     const d = currentData(opts);
-    const bg = opts.includeBg ? state.bg : null;
-    paint(canvas, tpl, W, H, d, opts, bg);
+    paint(canvas, tpl, W, H, d, opts);
     // Map templates fetch tiles on first paint; wait for them, then paint again.
     for (let i = 0; i < 3 && OV.mapPending(); i++) {
       await OV.mapSettled();
-      paint(canvas, tpl, W, H, d, opts, bg);
+      paint(canvas, tpl, W, H, d, opts);
     }
     const name = `${slug(d.name)}-${tpl.id}-${opts.size}.png`;
     return new Promise((resolve) =>
@@ -505,7 +502,7 @@
     ['dragleave', 'drop'].forEach((ev) =>
       drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
     drop.addEventListener('drop', (e) => {
-      const f = [...e.dataTransfer.files].find((x) => /\.gpx$/i.test(x.name)) || e.dataTransfer.files[0];
+      const f = [...e.dataTransfer.files].find((x) => /\.(gpx|fit)$/i.test(x.name)) || e.dataTransfer.files[0];
       handleFile(f);
     });
     // Stop the browser from opening files dropped outside the drop zone.
@@ -515,13 +512,6 @@
     $('demo').addEventListener('click', () => {
       loadGPXText(OV.demoGPX(), true);
       showStage();
-    });
-    $('bgInput').addEventListener('change', (e) => handleBg(e.target.files[0]));
-    $('clearBg').addEventListener('click', () => {
-      state.bg = null;
-      $('bgInput').value = '';
-      $('clearBg').hidden = true;
-      renderAll();
     });
 
     document.querySelectorAll('.controls input, .controls select').forEach((el) => {

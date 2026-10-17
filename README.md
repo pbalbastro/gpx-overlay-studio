@@ -11,7 +11,7 @@ cd gpx-overlay/public
 python3 -m http.server 8000   # then visit http://localhost:8000
 ```
 
-Drop a GPX file on the upload box (try `samples/morning-run.gpx`), pick a template and click **Download PNG** (on phones, **Save to Photos**).
+Drop a GPX or FIT file on the upload box (try `samples/morning-run.gpx`), pick a template and click **Download PNG** (on phones, **Save to Photos**).
 
 The **Connect with Strava** panel appears only when the site runs on the Cloudflare Worker (below). Opened as a plain file or from a static host, the app works with GPX upload only.
 
@@ -46,16 +46,16 @@ One-time setup:
 
 To test locally, put the same three values in a `.dev.vars` file, one `NAME=value` per line, and never commit it. Then run `npx wrangler dev` and open <http://localhost:8787>.
 
-New Strava API apps allow **one athlete**, the app owner, until Strava approves more. Request a higher limit from Strava's developer settings so club members can connect. Until then, they can still upload GPX files.
+New Strava API apps allow **one athlete**, the app owner, until Strava approves more. Request a higher limit from Strava's developer settings so club members can connect. Until then, they can still upload GPX or FIT files.
 
 ## Features
 
 - Parses `trkpt` (or `rtept`) points: distance (haversine), moving time, pace or speed, elevation gain, per-km/mi splits and the elevation profile
-- 50 overlay templates: Classic Stack, Route Hero, Bottom Bar, Corner Stack, Big Number, Minimal Route, Four Corners, Side Accent, Contents (table-of-contents list of every stat in the file), Activity Card, Elevation Profile, Splits, One Line, Route Map, Middle Finger, Rock On, Stats Grid (sports-watch style, with heart rate and cadence when the GPX has them), Strava Stats (app-style stat screen; power from the GPX, calories from Strava), Stacked Route (the route repeated in fading layers like an extruded ribbon, with a big italic distance), Course Data (a spec-sheet table of four stats that follow the activity type, over a lime elevation profile with start and high-point markers), Apple Fitness inspired layouts (Activity Rings, Workout Summary, Pace Map, Split Times, Heart Rate) and Garmin inspired layouts (HR Zones, Connect Summary, Elevation Chart), plus TTRC running-club layouts (TTRC Classic, TTRC Side, TTRC Pace, TTRC Bar) with a STRAVA | TTRC lockup, KL Bisiklista Classic with a STRAVA | KL BISIKLISTA lockup, APIMYCC cycling-club layouts (Classic, Ride Bar, Side, Hero, Climb) with a STRAVA | APIMYCC lockup, and minimalist WHITE layouts (Hairline, Caption, Quiet Number, Frame, Echo, Sketch) in light white type with a thin white route, and MAP layouts (Activity Page, Activity Page 3D with a tilted satellite map over real terrain, Feed Card, Feed Card Stats with the six Strava stat-screen stats, Map Tile, Full Map) that put the route on a real street map styled like the Strava app (OpenStreetMap data via [OpenFreeMap](https://openfreemap.org), rendered with MapLibre GL, 3D terrain from the open Terrarium elevation tiles on AWS, satellite imagery from Esri World Imagery; no API key)
+- Reads FIT files (the binary format Garmin, Wahoo, Coros and others record in) with no library: GPS records become track points, the sport picks run or ride, and the device's own distance, elapsed time, ascent, calories and averages replace the GPS-derived ones. Indoor files without GPS get stats but no route; a zipped Garmin "Export Original" asks to be unzipped first
+- 50 overlay templates: Classic Stack, Route Hero, Bottom Bar, Corner Stack, Big Number, Minimal Route, Four Corners, Side Accent, Contents (table-of-contents list of every stat in the file), Activity Card, Elevation Profile, Splits, One Line, Route Map, Middle Finger, Rock On, Stats Grid (sports-watch style, with heart rate and cadence when the GPX has them), Strava Stats (app-style stat screen; power from the GPX, calories from Strava), Stacked Route (the route repeated in fading layers like an extruded ribbon, with a big italic distance), Course Data (a spec-sheet table of four stats that follow the activity type, over a lime elevation profile with start and high-point markers), Apple Fitness inspired layouts (Activity Rings, Workout Summary, Pace Map, Split Times, Heart Rate) and Garmin inspired layouts (HR Zones, Connect Summary, Elevation Chart), plus TTRC running-club layouts (TTRC Classic, TTRC Side, TTRC Pace, TTRC Bar) with a STRAVA | TTRC lockup, KL Bisiklista layouts (Classic, plus minimal Horizon, Timeline and Viewfinder in light type with orange accents) with a STRAVA | KL BISIKLISTA lockup, APIMYCC cycling-club layouts (Classic, Ride Bar, Side, Hero, Climb) with a STRAVA | APIMYCC lockup, and minimalist WHITE layouts (Hairline, Caption, Quiet Number, Frame, Echo, Sketch) in light white type with a thin white route, and MAP layouts (Activity Page, Activity Page 3D with a tilted satellite map over real terrain, Feed Card, Feed Card Stats with the six Strava stat-screen stats, Map Tile, Full Map) that put the route on a real street map styled like the Strava app (OpenStreetMap data via [OpenFreeMap](https://openfreemap.org), rendered with MapLibre GL, 3D terrain from the open Terrarium elevation tiles on AWS, satellite imagery from Esri World Imagery; no API key)
 - Story (1080×1920), Portrait (1080×1350) and Square (1080×1080) exports
 - km or miles
 - Editable title, STRAVA logo (drawn from the logotype image, like the club logos), adjustable route thickness, optional soft shadow
-- Preview on your own photo, and optionally bake the photo into the export
 - Connect with Strava: pick a recent activity and use Strava's exact totals, including calories and power
 
 ## Project layout
@@ -67,6 +67,7 @@ public/index.html          UI markup
 public/css/style.css       app styling
 public/js/logos.js         embedded club logos (image + vector; source PNGs in assets/)
 public/js/gpx.js           GPX parsing, stats, formatting, demo activity
+public/js/fit.js           FIT file reader (track points, session totals, device name)
 public/js/demo.js          the demo run ("Morning Run"), compactly encoded
 public/js/strava.js        Strava panel; converts Strava activities to the app's stats
 public/js/render.js        canvas primitives (text, stat stacks/rows, route, elevation profile)

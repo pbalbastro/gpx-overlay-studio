@@ -641,15 +641,101 @@ window.OV = window.OV || {};
           (x, y, s) => OV.lockup(ctx, d, x, y, 60 * s, 'center', W * 0.9, 'kl'));
       },
     },
+    {
+      id: 'kl-horizon',
+      name: 'KL Bisiklista Horizon',
+      desc: 'A thin orange route resting on a full-width orange horizon, light stats beneath.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const short = H / W < 1.5;
+        const hy = H * (short ? 0.58 : 0.62);
+        const rtop = H * (short ? 0.1 : 0.16), rh = hy - 50 * s - rtop;
+        // The route sits on the horizon: bottom-aligned in its box.
+        const pts = d.route && d.route.length > 1 ? OV.fitRoute(d.route, { x: W * 0.14, y: rtop, w: W * 0.72, h: rh }) : [];
+        const low = pts.length ? Math.max(...pts.map((p) => p.y)) : 0;
+        OV.drawRoute(ctx, d.route, { x: W * 0.14, y: rtop + (hy - 40 * s - low), w: W * 0.72, h: rh }, { width: 5 * s * d.rw });
+        ctx.save();
+        ctx.fillStyle = ORANGE;
+        ctx.fillRect(0, hy, W, Math.max(1, 3 * s));
+        ctx.restore();
 
+        const colW = (W - 160 * s) / 3, ly = hy + 90 * s;
+        [d.dist, d.pace, d.time].forEach((it, i) => {
+          const x = 80 * s + colW * (i + 0.5);
+          capsLabel(ctx, it.label, x, ly, 22 * s);
+          OV.text(ctx, it.value, x, ly + 74 * s, { size: 54 * s, weight: 300, family: OV.INTER, maxWidth: colW * 0.9 });
+        });
+        OV.lockup(ctx, d, cx, H - (short ? 90 : 160) * s, 34 * s, 'center', W * 0.7, 'kl');
+      },
+    },
+    {
+      id: 'kl-timeline',
+      name: 'KL Bisiklista Timeline',
+      desc: 'A thin orange line down the middle; the stats branch off it left and right, the route at its end.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const short = H / W < 1.5, k = short ? 0.72 : 1;
+        const lb = H * 0.07 + 26 * s;
+        OV.lockup(ctx, d, cx, lb, 34 * s, 'center', W * 0.7, 'kl');
+        const rh = Math.min(H * 0.16, 260 * s), ry = H - (short ? 70 : 150) * s - rh;
+        const top = lb + 70 * s, bottom = ry - 60 * s;
+        ctx.save();
+        ctx.fillStyle = ORANGE;
+        ctx.fillRect(cx - 1.5 * s, top, 3 * s, bottom - top);
+        const items = [d.dist, d.pace, d.elev, d.time];
+        const step = (bottom - top) / items.length;
+        items.forEach((it, i) => {
+          const y = top + step * (i + 0.5), left = i % 2 === 0;
+          ctx.beginPath();
+          ctx.arc(cx, y, 9 * s, 0, Math.PI * 2);
+          ctx.fill();
+          const x = left ? cx - 50 * s : cx + 50 * s, align = left ? 'right' : 'left';
+          capsLabel(ctx, it.label, x, y - 18 * s * k, 22 * s, align);
+          OV.text(ctx, it.value, x, y + 48 * s * k, { size: 56 * s * k, weight: 300, family: OV.INTER, align, maxWidth: W * 0.4 });
+        });
+        ctx.restore();
+        OV.drawRoute(ctx, d.route, { x: cx - W * 0.25, y: ry, w: W * 0.5, h: rh }, { width: 4 * s * d.rw });
+      },
+    },
+    {
+      id: 'kl-viewfinder',
+      name: 'KL Bisiklista Viewfinder',
+      desc: 'Orange camera-corner brackets framing a thin orange route, light stats squared to the frame.',
+      draw(ctx, W, H, d) {
+        const s = W / 1080, cx = W / 2;
+        const short = H / W < 1.5;
+        const lb = H * 0.07 + 26 * s;
+        OV.lockup(ctx, d, cx, lb, 34 * s, 'center', W * 0.7, 'kl');
+        const fx = W * 0.12, fw = W * 0.76, fy = lb + 90 * s;
+        const fh = short ? H - fy - 300 * s : H * 0.48;
+        const arm = 64 * s, t = 4 * s;
+        ctx.save();
+        ctx.fillStyle = ORANGE;
+        for (const [x, y, sx, sy] of [[fx, fy, 1, 1], [fx + fw, fy, -1, 1], [fx, fy + fh, 1, -1], [fx + fw, fy + fh, -1, -1]]) {
+          ctx.fillRect(sx > 0 ? x : x - arm, sy > 0 ? y : y - t, arm, t);
+          ctx.fillRect(sx > 0 ? x : x - t, sy > 0 ? y : y - arm, t, arm);
+        }
+        ctx.restore();
+        const pad = 70 * s;
+        OV.drawRoute(ctx, d.route, { x: fx + pad, y: fy + pad, w: fw - 2 * pad, h: fh - 2 * pad }, { width: 5 * s * d.rw });
+
+        // Stats squared to the frame: first flush left, last flush right.
+        const ly = fy + fh + 90 * s;
+        [[d.dist, fx, 'left'], [d.pace, cx, 'center'], [d.time, fx + fw, 'right']].forEach(([it, x, align]) => {
+          capsLabel(ctx, it.label, x, ly, 22 * s, align);
+          OV.text(ctx, it.value, x, ly + 74 * s, { size: 54 * s, weight: 300, family: OV.INTER, align, maxWidth: fw / 3.2 });
+        });
+      },
+    },
     // ---------- APIMYCC cycling club ("STRAVA | APIMYCC" lockup) ----------
     {
       id: 'apimycc-classic',
       name: 'APIMYCC Classic',
-      desc: 'Centered ride stats and route with the STRAVA | APIMYCC lockup.',
+      desc: 'Centered ride stats and route with STRAVA and the APIMYCC pill badge.',
       draw(ctx, W, H, d) {
         classicLayout(ctx, W, H, d, [d.dist, d.speed, d.time],
-          (x, y, s) => OV.lockup(ctx, d, x, y, 54 * s, 'center', W * 0.84, 'apimycc'));
+          (x, y, s) => OV.lockup(ctx, d, x, y, 54 * s, 'center', W * 0.84, 'apimyccbadge'),
+          { rough: true, routeScale: 0.75 });
       },
     },
     {
@@ -2498,7 +2584,8 @@ window.OV = window.OV || {};
   // north-south route grows tall instead of shrinking to fit a short, wide strip.
   // On shorter canvases (square/portrait) the stats are a bit tighter and the logo
   // sits near the bottom edge, leaving more room for the route.
-  // `o.color` tints the stats and route (default: white stats, orange route).
+  // `o.color` tints the stats and route (default: white stats, orange route);
+  // `o.rough` draws the route hand-drawn and `o.routeScale` scales its width.
   function classicLayout(ctx, W, H, d, items, footer, o = {}) {
     const s = W / 1080, cx = W / 2;
     const short = H / W < 1.5;
@@ -2511,7 +2598,9 @@ window.OV = window.OV || {};
     const footerY = short ? H - 110 * s : H * 0.76;
     const minH = Math.min(170 * s, H * 0.11);
     const rh = Math.max(minH, footerY - 140 * s * k - top);
-    OV.drawRoute(ctx, d.route, { x: cx - W * 0.35, y: top, w: W * 0.7, h: rh }, { width: 11 * s * d.rw, color: o.color });
+    OV.drawRoute(ctx, d.route, { x: cx - W * 0.35, y: top, w: W * 0.7, h: rh }, {
+      width: 11 * s * d.rw * (o.routeScale || 1), color: o.color, rough: o.rough,
+    });
     footer(cx, top + rh + 140 * s * k, s);
   }
 

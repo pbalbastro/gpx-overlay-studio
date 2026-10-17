@@ -281,6 +281,23 @@ window.OV = window.OV || {};
       aspect: () => (logos.apimycc ? logos.apimycc.width / logos.apimycc.height : 0),
       draw: (ctx, x, top, h) => ctx.drawImage(logos.apimycc, x, top, h * MARKS.apimycc.aspect(), h),
     },
+    // APIMYCC badge: the lettering inside a white pill outline, like the club's
+    // jersey patch. The pill is 1.6x the wordmark; letters fill half its height.
+    apimyccbadge: {
+      scale: 1.6,
+      aspect: () => (logos.apimycc ? 0.5 * (logos.apimycc.width / logos.apimycc.height) + 0.9 : 0),
+      draw: (ctx, x, top, h) => {
+        const w = h * MARKS.apimyccbadge.aspect(), lw = h * 0.075;
+        ctx.save();
+        ctx.strokeStyle = WHITE;
+        ctx.lineWidth = lw;
+        roundRect(ctx, x + lw / 2, top + lw / 2, w - lw, h - lw, h / 2);
+        ctx.stroke();
+        ctx.restore();
+        const lh = h * 0.5, lwid = lh * (logos.apimycc.width / logos.apimycc.height);
+        ctx.drawImage(logos.apimycc, x + (w - lwid) / 2, top + (h - lh) / 2, lwid, lh);
+      },
+    },
     // APIMY: full-colour lettering with the "Active Pinoys in Malaysia" tagline under
     // it. The APIMY letters (top ~70% of the image) come out ~1.25x the wordmark.
     apimy: {
@@ -425,6 +442,43 @@ window.OV = window.OV || {};
     ctx.lineTo(e.x, e.y);
   }
 
+  // Hand-drawn stroke: the line drifts a little off the track and its width swells
+  // and thins, like a marker. Noise runs on distance measured in line widths with
+  // fixed phases, so a preview and its export wobble the same way.
+  function roughStroke(ctx, pts, w) {
+    const wave = (t, f) => Math.sin(t * 0.23 + f) * 0.6 + Math.sin(t * 0.61 + f * 2.3) * 0.3 + Math.sin(t * 1.7 + f * 4.1) * 0.1;
+    const step = w * 0.8;
+    // Resample evenly so the wobble doesn't depend on GPS point density.
+    const even = [pts[0]];
+    let carry = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      let at = step - carry;
+      while (at <= len) {
+        even.push({ x: a.x + ((b.x - a.x) * at) / len, y: a.y + ((b.y - a.y) * at) / len });
+        at += step;
+      }
+      carry = len - (at - step);
+    }
+    even.push(pts[pts.length - 1]);
+    const p = even.map((q, i) => {
+      const a = even[Math.max(0, i - 1)], b = even[Math.min(even.length - 1, i + 1)];
+      const dx = b.x - a.x, dy = b.y - a.y, n = Math.hypot(dx, dy) || 1;
+      const off = wave(i * 0.8, 1.3) * w * 0.32;
+      return { x: q.x - (dy / n) * off, y: q.y + (dx / n) * off };
+    });
+    // Short overlapping runs, each at its own width; round caps hide the joins.
+    const run = 6;
+    for (let i = 0; i < p.length - 1; i += run) {
+      ctx.beginPath();
+      ctx.moveTo(p[i].x, p[i].y);
+      for (let j = i + 1; j <= Math.min(i + run, p.length - 1); j++) ctx.lineTo(p[j].x, p[j].y);
+      ctx.lineWidth = w * (0.88 + wave(i * 0.8, 4.7) * 0.22);
+      ctx.stroke();
+    }
+  }
+
   function drawRoute(ctx, points, box, o = {}) {
     if (!points || points.length < 2) return []; // e.g. a manual Strava activity with no GPS
     const pts = fitRoute(points, box, o.align, o.view);
@@ -439,10 +493,14 @@ window.OV = window.OV || {};
       ctx.stroke();
       ctx.shadowColor = 'transparent';
     }
-    trace(ctx, pts);
     ctx.strokeStyle = o.color || ORANGE;
-    ctx.lineWidth = w;
-    ctx.stroke();
+    if (o.rough) {
+      roughStroke(ctx, pts, w);
+    } else {
+      trace(ctx, pts);
+      ctx.lineWidth = w;
+      ctx.stroke();
+    }
     if (o.markers) {
       ctx.shadowColor = 'transparent';
       const a = pts[0];
@@ -532,15 +590,8 @@ window.OV = window.OV || {};
     ctx.closePath();
   }
 
-  function drawCover(ctx, img, W, H) {
-    const sc = Math.max(W / img.width, H / img.height);
-    const w = img.width * sc;
-    const h = img.height * sc;
-    ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
-  }
-
   Object.assign(OV, {
     WHITE, ORANGE, CONDENSED, INTER, HAND, DIN, MONO, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
-    drawRoute, drawProfile, roundRect, drawCover, routeView, fitRoute,
+    drawRoute, drawProfile, roundRect, routeView, fitRoute,
   });
 })(window.OV);

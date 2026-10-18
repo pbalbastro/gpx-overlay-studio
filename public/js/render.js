@@ -444,8 +444,10 @@ window.OV = window.OV || {};
 
   // Hand-drawn stroke: the line drifts a little off the track and its width swells
   // and thins, like a marker. Noise runs on distance measured in line widths with
-  // fixed phases, so a preview and its export wobble the same way.
-  function roughStroke(ctx, pts, w) {
+  // fixed phases, so a preview and its export wobble the same way. `o.amp` sets the
+  // drift (in line widths); `o.phase` shifts the noise so separate strokes differ.
+  function roughStroke(ctx, pts, w, o = {}) {
+    const amp = o.amp != null ? o.amp : 0.32, f0 = o.phase || 0;
     const wave = (t, f) => Math.sin(t * 0.23 + f) * 0.6 + Math.sin(t * 0.61 + f * 2.3) * 0.3 + Math.sin(t * 1.7 + f * 4.1) * 0.1;
     const step = w * 0.8;
     // Resample evenly so the wobble doesn't depend on GPS point density.
@@ -465,18 +467,32 @@ window.OV = window.OV || {};
     const p = even.map((q, i) => {
       const a = even[Math.max(0, i - 1)], b = even[Math.min(even.length - 1, i + 1)];
       const dx = b.x - a.x, dy = b.y - a.y, n = Math.hypot(dx, dy) || 1;
-      const off = wave(i * 0.8, 1.3) * w * 0.32;
+      const off = wave(i * 0.8, 1.3 + f0) * w * amp;
       return { x: q.x - (dy / n) * off, y: q.y + (dx / n) * off };
     });
-    // Short overlapping runs, each at its own width; round caps hide the joins.
-    const run = 6;
+    // Short overlapping runs, each at its own width; round caps hide the joins. They
+    // go on a layer that is then drawn in one go, so the shadow is cast once for
+    // the whole line instead of piling up where the runs overlap.
+    const layer = document.createElement('canvas');
+    layer.width = ctx.canvas.width;
+    layer.height = ctx.canvas.height;
+    const c = layer.getContext('2d');
+    c.setTransform(ctx.getTransform());
+    c.strokeStyle = ctx.strokeStyle;
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    const run = 2;
     for (let i = 0; i < p.length - 1; i += run) {
-      ctx.beginPath();
-      ctx.moveTo(p[i].x, p[i].y);
-      for (let j = i + 1; j <= Math.min(i + run, p.length - 1); j++) ctx.lineTo(p[j].x, p[j].y);
-      ctx.lineWidth = w * (0.88 + wave(i * 0.8, 4.7) * 0.22);
-      ctx.stroke();
+      c.beginPath();
+      c.moveTo(p[i].x, p[i].y);
+      for (let j = i + 1; j <= Math.min(i + run, p.length - 1); j++) c.lineTo(p[j].x, p[j].y);
+      c.lineWidth = w * (0.88 + wave(i * 0.8, 4.7 + f0) * 0.22);
+      c.stroke();
     }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(layer, 0, 0);
+    ctx.restore();
   }
 
   function drawRoute(ctx, points, box, o = {}) {
@@ -592,6 +608,6 @@ window.OV = window.OV || {};
 
   Object.assign(OV, {
     WHITE, ORANGE, CONDENSED, INTER, HAND, DIN, MONO, measure, fitSize, text, stack, stackHeight, row, wordmark, lockup, drawClubLogo, loadLogos, drawLogo,
-    drawRoute, drawProfile, roundRect, routeView, fitRoute,
+    drawRoute, drawProfile, roundRect, routeView, fitRoute, roughStroke,
   });
 })(window.OV);

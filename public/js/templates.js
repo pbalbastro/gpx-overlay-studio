@@ -349,7 +349,7 @@ window.OV = window.OV || {};
       id: 'finger',
       name: 'Middle Finger',
       desc: 'Bold orange hand outline beside a compact stat column.',
-      draw(ctx, W, H, d) { handLayout(ctx, W, H, d, HANDS.middle); },
+      draw(ctx, W, H, d) { handLayout(ctx, W, H, d, HANDS.middle, { rough: true }); },
     },
     {
       id: 'horns',
@@ -2300,7 +2300,7 @@ window.OV = window.OV || {};
     },
   };
 
-  function drawHand(ctx, shape, box, width) {
+  function drawHand(ctx, shape, box, width, rough) {
     const sc = Math.min(box.w / shape.w, box.h / shape.h);
     const mx = (x) => (shape.mirror ? shape.w - x : x);
     const P = (x, y) => [box.x + mx(x) * sc, box.y + y * sc];
@@ -2309,6 +2309,14 @@ window.OV = window.OV || {};
     ctx.lineWidth = width * (shape.weight || 1);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
+    if (rough) {
+      // Flatten each path to points, then stroke it like a hand-drawn route.
+      handPolylines(shape, P, sc).forEach((pts, i) => {
+        OV.roughStroke(ctx, pts, ctx.lineWidth, { amp: 0.22, phase: i * 2.9 });
+      });
+      ctx.restore();
+      return;
+    }
     ctx.beginPath();
     for (const path of shape.paths) {
       for (const [cmd, ...a] of path) {
@@ -2330,11 +2338,46 @@ window.OV = window.OV || {};
     ctx.restore();
   }
 
+  // The hand's paths as point lists (curves and arcs sampled), for a rough stroke.
+  function handPolylines(shape, P, sc) {
+    const out = [];
+    let pts = null;
+    const at = (x, y) => { const [px, py] = P(x, y); return { x: px, y: py }; };
+    for (const path of shape.paths) {
+      for (const [cmd, ...a] of path) {
+        if (cmd === 'M') out.push(pts = [at(a[0], a[1])]);
+        else if (cmd === 'L') pts.push(at(a[0], a[1]));
+        else if (cmd === 'C') {
+          const p0 = pts[pts.length - 1], p1 = at(a[0], a[1]), p2 = at(a[2], a[3]), p3 = at(a[4], a[5]);
+          for (let k = 1; k <= 16; k++) {
+            const t = k / 16, u = 1 - t;
+            pts.push({
+              x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+              y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y,
+            });
+          }
+        } else if (cmd === 'A') {
+          // Same angles and direction as drawHand's arc (mirroring flips both).
+          const [cx, cy] = P(a[0], a[1]), r = a[2] * sc;
+          let s0 = a[3] * Math.PI, s1 = a[4] * Math.PI;
+          if (shape.mirror) { s0 = Math.PI - s0; s1 = Math.PI - s1; if (s1 > s0) s1 -= 2 * Math.PI; }
+          else if (s1 < s0) s1 += 2 * Math.PI;
+          for (let k = 0; k <= 24; k++) {
+            const ang = s0 + ((s1 - s0) * k) / 24;
+            pts.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r });
+          }
+        } else pts.push({ ...pts[0] }); // Z
+      }
+    }
+    return out.filter((p) => p.length > 1);
+  }
+
   // Hand on the left, wordmark and Distance / Elev Gain / Time on the right.
-  function handLayout(ctx, W, H, d, shape) {
+  // `opts.rough` draws the outline wobbly, as if by hand.
+  function handLayout(ctx, W, H, d, shape, opts = {}) {
     const s = W / 1080;
     const hw = W * 0.34, hh = (hw * shape.h) / shape.w;
-    drawHand(ctx, shape, { x: W * 0.12, y: H / 2 - hh / 2, w: hw, h: hh }, 24 * s * d.rw);
+    drawHand(ctx, shape, { x: W * 0.12, y: H / 2 - hh / 2, w: hw, h: hh }, 24 * s * d.rw, opts.rough);
 
     const x = W * 0.56;
     const o = { labelSize: 26 * s, valueSize: 52 * s, gap: 34 * s, align: 'left', labelWeight: 700, maxWidth: W * 0.38 };
